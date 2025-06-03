@@ -2,110 +2,103 @@ package packed
 
 import (
 	"packed"
-	"packed/test"
 )
 
-var (
-	MonkeyConverter = &test.Monkey{}
-	Int8Converter   = &packed.Int8{}
-)
+var ()
 
 type A struct {
 	A int8
-	B int8
-	C int8
-	D int16
+	B int16
 }
 
-func (reciever *A) ToBytesLittleEndian(bytes []byte, index int) {
-	Int8Converter.ToBytesLittleEndian(&reciever.A, bytes, index+0)
-	Int8Converter.ToBytesLittleEndian(&reciever.B, bytes, index+1)
-	Int8Converter.ToBytesLittleEndian(&reciever.C, bytes, index+2)
-	packed.Int16Converter.ToBytesLittleEndian(&reciever.D, bytes, index+3)
+func (reciever *A) Size() int {
+	return 0
 }
 
-func (reciever *A) FromBytesLittleEndian(bytes []byte, index int) {
-	Int8Converter.FromBytesLittleEndian(&reciever.A, bytes, index+0)
-	Int8Converter.FromBytesLittleEndian(&reciever.B, bytes, index+1)
-	Int8Converter.FromBytesLittleEndian(&reciever.C, bytes, index+2)
-	packed.Int16Converter.FromBytesLittleEndian(&reciever.D, bytes, index+3)
+func (reciever *A) ToBytes(bytes []byte, index int) {
+	packed.Int8Converter.ToBytesLittleEndian(&reciever.A, bytes, index+0)
+	packed.Int16Converter.ToBytesBigEndian(&reciever.B, bytes, index+1)
 }
 
-func (reciever *A) ToBytesBigEndian(bytes []byte, index int) {
-	Int8Converter.ToBytesBigEndian(&reciever.A, bytes, index+0)
-	Int8Converter.ToBytesBigEndian(&reciever.B, bytes, index+1)
-	Int8Converter.ToBytesBigEndian(&reciever.C, bytes, index+2)
-	packed.Int16Converter.ToBytesBigEndian(&reciever.D, bytes, index+3)
-}
-
-func (reciever *A) FromBytesBigEndian(bytes []byte, index int) {
-	Int8Converter.FromBytesBigEndian(&reciever.A, bytes, index+0)
-	Int8Converter.FromBytesBigEndian(&reciever.B, bytes, index+1)
-	Int8Converter.FromBytesBigEndian(&reciever.C, bytes, index+2)
-	packed.Int16Converter.FromBytesBigEndian(&reciever.D, bytes, index+3)
+func (reciever *A) FromBytes(bytes []byte, index int) {
+	packed.Int8Converter.FromBytesLittleEndian(&reciever.A, bytes, index+0)
+	packed.Int16Converter.FromBytesBigEndian(&reciever.B, bytes, index+1)
 }
 
 type D struct {
-	A         int8
-	B         int8
-	Converter test.MonkeyEnum
-	Custom    test.Custom
-}
-
-func (reciever *D) ToBytesLittleEndian(bytes []byte, index int) {
-	Int8Converter.ToBytesLittleEndian(&reciever.A, bytes, index+0)
-	Int8Converter.ToBytesLittleEndian(&reciever.B, bytes, index+1)
-	MonkeyConverter.ToBytesLittleEndian(&reciever.Converter, bytes, index+2)
-	reciever.Custom.ToBytesLittleEndian(bytes, index+2)
-}
-
-func (reciever *D) FromBytesLittleEndian(bytes []byte, index int) {
-	Int8Converter.FromBytesLittleEndian(&reciever.A, bytes, index+0)
-	Int8Converter.FromBytesLittleEndian(&reciever.B, bytes, index+1)
-	MonkeyConverter.FromBytesLittleEndian(&reciever.Converter, bytes, index+2)
-	reciever.Custom.FromBytesLittleEndian(bytes, index+2)
-}
-
-func (reciever *D) ToBytesBigEndian(bytes []byte, index int) {
-	Int8Converter.ToBytesBigEndian(&reciever.A, bytes, index+0)
-	Int8Converter.ToBytesBigEndian(&reciever.B, bytes, index+1)
-	MonkeyConverter.ToBytesBigEndian(&reciever.Converter, bytes, index+2)
-	reciever.Custom.ToBytesBigEndian(bytes, index+2)
-}
-
-func (reciever *D) FromBytesBigEndian(bytes []byte, index int) {
-	Int8Converter.FromBytesBigEndian(&reciever.A, bytes, index+0)
-	Int8Converter.FromBytesBigEndian(&reciever.B, bytes, index+1)
-	MonkeyConverter.FromBytesBigEndian(&reciever.Converter, bytes, index+2)
-	reciever.Custom.FromBytesBigEndian(bytes, index+2)
-}
-
-type B struct {
 	A A
-	B int8 `json:"b"`
+	B A
+	C A
+}
+
+func (reciever *D) Size() int {
+	return 0
+}
+
+func (reciever *D) ToBytes(bytes []byte, index int) {
+	packed.Int8Converter.ToBytesBigEndian(&reciever.A.A, bytes, index+0)
+	packed.Int16Converter.ToBytesBigEndian(&reciever.A.B, bytes, index+1)
+	packed.Int8Converter.ToBytesLittleEndian(&reciever.B.A, bytes, index+3)
+	packed.Int16Converter.ToBytesLittleEndian(&reciever.B.B, bytes, index+4)
+	packed.Int8Converter.ToBytesBigEndian(&reciever.C.A, bytes, index+6)
+	packed.Int16Converter.ToBytesBigEndian(&reciever.C.B, bytes, index+7)
+}
+
+func (reciever *D) FromBytes(bytes []byte, index int) {
+	packed.Int8Converter.FromBytesBigEndian(&reciever.A.A, bytes, index+0)
+	packed.Int16Converter.FromBytesBigEndian(&reciever.A.B, bytes, index+1)
+	packed.Int8Converter.FromBytesLittleEndian(&reciever.B.A, bytes, index+3)
+	packed.Int16Converter.FromBytesLittleEndian(&reciever.B.B, bytes, index+4)
+	packed.Int8Converter.FromBytesBigEndian(&reciever.C.A, bytes, index+6)
+	packed.Int16Converter.FromBytesBigEndian(&reciever.C.B, bytes, index+7)
+}
+
+type C struct {
+	A uint16
+	B uint16
 	C D
+	D D
+	E A
 }
 
-func (reciever *B) ToBytesLittleEndian(bytes []byte, index int) {
-	reciever.A.ToBytesLittleEndian(bytes, index+0)
-	Int8Converter.ToBytesLittleEndian(&reciever.B, bytes, index+5)
-	reciever.C.ToBytesLittleEndian(bytes, index+6)
+func (reciever *C) Size() int {
+	return 0
 }
 
-func (reciever *B) FromBytesLittleEndian(bytes []byte, index int) {
-	reciever.A.FromBytesLittleEndian(bytes, index+0)
-	Int8Converter.FromBytesLittleEndian(&reciever.B, bytes, index+5)
-	reciever.C.FromBytesLittleEndian(bytes, index+6)
+func (reciever *C) ToBytes(bytes []byte, index int) {
+	packed.Uint16Converter.ToBytesBigEndian(&reciever.A, bytes, index+0)
+	packed.Uint16Converter.ToBytesLittleEndian(&reciever.B, bytes, index+2)
+	packed.Int8Converter.ToBytesBigEndian(&reciever.C.A.A, bytes, index+4)
+	packed.Int16Converter.ToBytesBigEndian(&reciever.C.A.B, bytes, index+5)
+	packed.Int8Converter.ToBytesBigEndian(&reciever.C.B.A, bytes, index+7)
+	packed.Int16Converter.ToBytesBigEndian(&reciever.C.B.B, bytes, index+8)
+	packed.Int8Converter.ToBytesBigEndian(&reciever.C.C.A, bytes, index+10)
+	packed.Int16Converter.ToBytesBigEndian(&reciever.C.C.B, bytes, index+11)
+	packed.Int8Converter.ToBytesLittleEndian(&reciever.D.A.A, bytes, index+13)
+	packed.Int16Converter.ToBytesLittleEndian(&reciever.D.A.B, bytes, index+14)
+	packed.Int8Converter.ToBytesLittleEndian(&reciever.D.B.A, bytes, index+16)
+	packed.Int16Converter.ToBytesLittleEndian(&reciever.D.B.B, bytes, index+17)
+	packed.Int8Converter.ToBytesLittleEndian(&reciever.D.C.A, bytes, index+19)
+	packed.Int16Converter.ToBytesLittleEndian(&reciever.D.C.B, bytes, index+20)
+	packed.Int8Converter.ToBytesLittleEndian(&reciever.E.A, bytes, index+22)
+	packed.Int16Converter.ToBytesBigEndian(&reciever.E.B, bytes, index+23)
 }
 
-func (reciever *B) ToBytesBigEndian(bytes []byte, index int) {
-	reciever.A.ToBytesBigEndian(bytes, index+0)
-	Int8Converter.ToBytesBigEndian(&reciever.B, bytes, index+5)
-	reciever.C.ToBytesBigEndian(bytes, index+6)
-}
-
-func (reciever *B) FromBytesBigEndian(bytes []byte, index int) {
-	reciever.A.FromBytesBigEndian(bytes, index+0)
-	Int8Converter.FromBytesBigEndian(&reciever.B, bytes, index+5)
-	reciever.C.FromBytesBigEndian(bytes, index+6)
+func (reciever *C) FromBytes(bytes []byte, index int) {
+	packed.Uint16Converter.FromBytesBigEndian(&reciever.A, bytes, index+0)
+	packed.Uint16Converter.FromBytesLittleEndian(&reciever.B, bytes, index+2)
+	packed.Int8Converter.FromBytesBigEndian(&reciever.C.A.A, bytes, index+4)
+	packed.Int16Converter.FromBytesBigEndian(&reciever.C.A.B, bytes, index+5)
+	packed.Int8Converter.FromBytesBigEndian(&reciever.C.B.A, bytes, index+7)
+	packed.Int16Converter.FromBytesBigEndian(&reciever.C.B.B, bytes, index+8)
+	packed.Int8Converter.FromBytesBigEndian(&reciever.C.C.A, bytes, index+10)
+	packed.Int16Converter.FromBytesBigEndian(&reciever.C.C.B, bytes, index+11)
+	packed.Int8Converter.FromBytesLittleEndian(&reciever.D.A.A, bytes, index+13)
+	packed.Int16Converter.FromBytesLittleEndian(&reciever.D.A.B, bytes, index+14)
+	packed.Int8Converter.FromBytesLittleEndian(&reciever.D.B.A, bytes, index+16)
+	packed.Int16Converter.FromBytesLittleEndian(&reciever.D.B.B, bytes, index+17)
+	packed.Int8Converter.FromBytesLittleEndian(&reciever.D.C.A, bytes, index+19)
+	packed.Int16Converter.FromBytesLittleEndian(&reciever.D.C.B, bytes, index+20)
+	packed.Int8Converter.FromBytesLittleEndian(&reciever.E.A, bytes, index+22)
+	packed.Int16Converter.FromBytesBigEndian(&reciever.E.B, bytes, index+23)
 }
