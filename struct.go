@@ -38,6 +38,7 @@ func Struct(name string, littleEndian bool, properties ...PackedProperty) Packed
 		packed.properties[i] = property
 	}
 
+	packed.size = size
 	packed.SetEndianProperties(littleEndian, false)
 
 	structs[name] = packed

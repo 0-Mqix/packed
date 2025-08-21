@@ -1,6 +1,7 @@
 package packed
 
 import (
+	"fmt"
 	"reflect"
 	"slices"
 )
@@ -12,6 +13,7 @@ const (
 	KindType
 	KindStruct
 	KindConverter
+	KindArray
 )
 
 type BitField struct {
@@ -31,6 +33,7 @@ type PackedProperty struct {
 	kind           Kind
 	littleEndian   bool
 	endianOverride bool
+	converter      *converterHash
 }
 
 type FieldOption func(*PackedProperty)
@@ -115,7 +118,16 @@ func validatePropertyType(propertyType any) (Kind, reflect.Type) {
 		return KindStruct, nil
 	}
 
+	if _, ok := propertyType.(PackedArray); ok {
+		return KindArray, nil
+	}
+
 	if reciever, ok := implementsConverterInterface(propertyType); ok {
+
+		if overwrite, ok := reciever.(OverwriteConverterReciverReflectionInterface); ok {
+			reciever = reflect.TypeOf(overwrite.OverwriteConverterReciverReflection(reflect.TypeOf(propertyType)))
+		}
+
 		return KindConverter, reciever
 	}
 
@@ -134,13 +146,26 @@ func Field[T any](name string, options ...FieldOption) PackedProperty {
 
 	property.kind, property.recieverType = validatePropertyType(property.packed)
 
+	if property.kind == KindInvalid {
+		panic(fmt.Sprintf("invalid property type: %T", property.packed))
+	}
+
 	property.propertyType = reflect.TypeOf(property.packed)
 
-	if _, exists := converters[property.propertyType]; !exists && property.kind == KindConverter {
-		converters[property.propertyType] = converter{variable: property.propertyType.Elem().Name() + "Converter", external: false}
+	if property.kind == KindConverter {
+
+		hash := createConverterHash(property.packed)
+
+		if _, exists := converters[hash.hash]; !exists {
+			converters[hash.hash] = hash
+		}
+
+		property.converter = &hash
 	}
 
 	property.size = property.packed.(interface{ Size() int }).Size()
+
+	fmt.Println(property.propertyType)
 
 	imported[property.propertyType.PkgPath()] = true
 

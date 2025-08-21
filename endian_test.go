@@ -1,8 +1,7 @@
-package tests
+package packed
 
 import (
 	"maps"
-	. "packed"
 	"regexp"
 	"testing"
 )

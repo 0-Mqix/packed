@@ -1,34 +1,10 @@
 package packed
 
 import (
+	"fmt"
 	"math"
+	"strings"
 )
-
-var BoolConverter = &Bool{}
-var Int8Converter = &Int8{}
-var Int16Converter = &Int16{}
-var Int32Converter = &Int32{}
-var Int64Converter = &Int64{}
-var Uint8Converter = &Uint8{}
-var Uint16Converter = &Uint16{}
-var Uint32Converter = &Uint32{}
-var Uint64Converter = &Uint64{}
-var Float32Converter = &Float32{}
-var Float64Converter = &Float64{}
-
-func init() {
-	RegisterConverter[Bool]("BoolConverter")
-	RegisterConverter[Int8]("Int8Converter")
-	RegisterConverter[Int16]("Int16Converter")
-	RegisterConverter[Int32]("Int32Converter")
-	RegisterConverter[Int64]("Int64Converter")
-	RegisterConverter[Uint8]("Uint8Converter")
-	RegisterConverter[Uint16]("Uint16Converter")
-	RegisterConverter[Uint32]("Uint32Converter")
-	RegisterConverter[Uint64]("Uint64Converter")
-	RegisterConverter[Float32]("Float32Converter")
-	RegisterConverter[Float64]("Float64Converter")
-}
 
 type Bool struct{}
 
@@ -334,4 +310,36 @@ func (Float64) ToBytesBigEndian(value *float64, bytes []byte, index int) {
 func (Float64) FromBytesBigEndian(receiver *float64, bytes []byte, index int) {
 	v := uint64(bytes[index])<<56 | uint64(bytes[index+1])<<48 | uint64(bytes[index+2])<<40 | uint64(bytes[index+3])<<32 | uint64(bytes[index+4])<<24 | uint64(bytes[index+5])<<16 | uint64(bytes[index+6])<<8 | uint64(bytes[index+7])
 	*receiver = math.Float64frombits(v)
+}
+
+func String(length int) *StringConverter {
+	return &StringConverter{Length: length}
+}
+
+type StringConverter struct {
+	Length int `packed_hash_field:"length"`
+}
+
+func (s *StringConverter) InitializeConverterFields() map[string]string {
+	return map[string]string{
+		"Length": fmt.Sprintf("%v", s.Length),
+	}
+}
+
+func (s StringConverter) Size() int { return s.Length }
+
+func (s StringConverter) ToBytesLittleEndian(value *string, bytes []byte, index int) {
+	copy(bytes[index:index+s.Length], []byte(*value))
+}
+
+func (s StringConverter) FromBytesLittleEndian(receiver *string, bytes []byte, index int) {
+	*receiver = strings.TrimRight(string(bytes[index:index+s.Length]), "\x00")
+}
+
+func (s StringConverter) ToBytesBigEndian(value *string, bytes []byte, index int) {
+	s.ToBytesLittleEndian(value, bytes, index)
+}
+
+func (s StringConverter) FromBytesBigEndian(receiver *string, bytes []byte, index int) {
+	s.FromBytesLittleEndian(receiver, bytes, index)
 }

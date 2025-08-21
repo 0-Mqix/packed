@@ -1,8 +1,7 @@
-package tests
+package packed
 
 import (
 	"math"
-	. "packed"
 	"testing"
 )
 
@@ -267,5 +266,20 @@ func TestFloat64Converter(t *testing.T) {
 		if resultBigEndian != original {
 			t.Errorf("Float64 FromBytesBigEndian: expected %f, got %f", original, resultBigEndian)
 		}
+	}
+}
+
+func TestStringConverter(t *testing.T) {
+	converter := String(10)
+	original := "test"
+
+	bytes := make([]byte, converter.Size())
+
+	converter.ToBytesLittleEndian(&original, bytes, 0)
+	var result string
+	converter.FromBytesLittleEndian(&result, bytes, 0)
+
+	if result != original {
+		t.Errorf("StringConverter: expected %s, got %s", original, result)
 	}
 }
