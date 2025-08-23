@@ -26,8 +26,8 @@ func getEndianProperties(source []byte) EndianProperties {
 func TestEndianSettings(t *testing.T) {
 
 	var a = Struct("A", true,
-		Field[Int8]("A"),
-		Field[Int16]("B", LittleEndian(false)),
+		Field("A", Int8),
+		Field("B", Int16, LittleEndian(false)),
 	)
 
 	intput := EndianProperties{
@@ -42,9 +42,9 @@ func TestEndianSettings(t *testing.T) {
 	}
 
 	var b = Struct("D", false,
-		Field[any]("A", Type(a), LittleEndian(false)),
-		Field[any]("B", Type(a), LittleEndian(true)),
-		Field[any]("C", Type(a)),
+		Field("A", a, LittleEndian(false)),
+		Field("B", a, LittleEndian(true)),
+		Field("C", a),
 	)
 
 	intput = EndianProperties{
@@ -63,11 +63,11 @@ func TestEndianSettings(t *testing.T) {
 	}
 
 	var c = Struct("C", true,
-		Field[Uint16]("A", LittleEndian(false)),
-		Field[Uint16]("B"),
-		Field[any]("C", Type(b), LittleEndian(false)),
-		Field[any]("D", Type(b), LittleEndian(true)),
-		Field[any]("E", Type(a)),
+		Field("A", Uint16, LittleEndian(false)),
+		Field("B", Uint16),
+		Field("C", b, LittleEndian(false)),
+		Field("D", b, LittleEndian(true)),
+		Field("E", a),
 	)
 
 	intput = EndianProperties{

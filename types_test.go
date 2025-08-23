@@ -6,7 +6,7 @@ import (
 )
 
 func TestBoolConverter(t *testing.T) {
-	converter := Bool{}
+	converter := BoolConverter{}
 	values := []bool{true, false}
 
 	for _, original := range values {
@@ -40,7 +40,7 @@ func TestBoolConverter(t *testing.T) {
 }
 
 func TestInt8Converter(t *testing.T) {
-	converter := Int8{}
+	converter := Int8Converter{}
 	values := []int8{0, 1, -1, 127, -128}
 
 	for _, original := range values {
@@ -63,7 +63,7 @@ func TestInt8Converter(t *testing.T) {
 }
 
 func TestInt16Converter(t *testing.T) {
-	converter := Int16{}
+	converter := Int16Converter{}
 	values := []int16{0, 1, -1, 255, -255, 32767, -32768}
 
 	for _, original := range values {
@@ -86,7 +86,7 @@ func TestInt16Converter(t *testing.T) {
 }
 
 func TestInt32Converter(t *testing.T) {
-	converter := Int32{}
+	converter := Int32Converter{}
 	values := []int32{0, 1, -1, 65535, -65535, 2147483647, -2147483648}
 
 	for _, original := range values {
@@ -109,7 +109,7 @@ func TestInt32Converter(t *testing.T) {
 }
 
 func TestInt64Converter(t *testing.T) {
-	converter := Int64{}
+	converter := Int64Converter{}
 	values := []int64{0, 1, -1, 4294967295, -4294967295, 9223372036854775807, -9223372036854775808}
 
 	for _, original := range values {
@@ -132,7 +132,7 @@ func TestInt64Converter(t *testing.T) {
 }
 
 func TestUint8Converter(t *testing.T) {
-	converter := Uint8{}
+	converter := Uint8Converter{}
 	values := []uint8{0, 1, 127, 128, 255}
 
 	for _, original := range values {
@@ -155,7 +155,7 @@ func TestUint8Converter(t *testing.T) {
 }
 
 func TestUint16Converter(t *testing.T) {
-	converter := Uint16{}
+	converter := Uint16Converter{}
 	values := []uint16{0, 1, 255, 256, 32767, 32768, 65535}
 
 	for _, original := range values {
@@ -178,7 +178,7 @@ func TestUint16Converter(t *testing.T) {
 }
 
 func TestUint32Converter(t *testing.T) {
-	converter := Uint32{}
+	converter := Uint32Converter{}
 	values := []uint32{0, 1, 65535, 65536, 2147483647, 2147483648, 4294967295}
 
 	for _, original := range values {
@@ -201,7 +201,7 @@ func TestUint32Converter(t *testing.T) {
 }
 
 func TestUint64Converter(t *testing.T) {
-	converter := Uint64{}
+	converter := Uint64Converter{}
 	values := []uint64{0, 1, 4294967295, 4294967296, 9223372036854775807, 9223372036854775808, 18446744073709551615}
 
 	for _, original := range values {
@@ -224,7 +224,7 @@ func TestUint64Converter(t *testing.T) {
 }
 
 func TestFloat32Converter(t *testing.T) {
-	converter := Float32{}
+	converter := Float32Converter{}
 	values := []float32{0.0, 1.0, -1.0, 3.14159, -3.14159, math.MaxFloat32, -math.MaxFloat32, math.SmallestNonzeroFloat32}
 
 	for _, original := range values {
@@ -247,7 +247,7 @@ func TestFloat32Converter(t *testing.T) {
 }
 
 func TestFloat64Converter(t *testing.T) {
-	converter := Float64{}
+	converter := Float64Converter{}
 	values := []float64{0.0, 1.0, -1.0, 3.141592653589793, -3.141592653589793, math.MaxFloat64, -math.MaxFloat64, math.SmallestNonzeroFloat64}
 
 	for _, original := range values {

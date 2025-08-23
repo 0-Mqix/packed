@@ -14,13 +14,9 @@ const (
 	KindStruct
 	KindConverter
 	KindArray
+	KindBitField
+	KindBitFieldGroup
 )
-
-type BitField struct {
-	bitSize  int
-	next     *BitField
-	previous *BitField
-}
 
 type PackedProperty struct {
 	name           string
@@ -29,7 +25,6 @@ type PackedProperty struct {
 	recieverType   reflect.Type
 	propertyType   reflect.Type
 	tags           map[string]string
-	bitField       *BitField
 	kind           Kind
 	littleEndian   bool
 	endianOverride bool
@@ -41,12 +36,6 @@ type FieldOption func(*PackedProperty)
 func Tag(key, value string) FieldOption {
 	return func(definition *PackedProperty) {
 		definition.tags[key] = value
-	}
-}
-
-func Bits(bits int) FieldOption {
-	return func(definition *PackedProperty) {
-		definition.bitField = &BitField{bitSize: bits}
 	}
 }
 
@@ -64,12 +53,11 @@ func (p *PackedStruct) replacePropertiesWithClone() {
 
 func Type(propertyType any) FieldOption {
 	return func(definition *PackedProperty) {
-		if packed, ok := propertyType.(PackedStruct); ok {
-			packed.replacePropertiesWithClone()
-			definition.packed = packed
-		} else {
-			definition.packed = propertyType
+
+		if reflect.TypeOf(definition.packed).String() != "*interface {}" {
+			panic("type option can only be used if the field generic argument is any")
 		}
+
 	}
 }
 
@@ -122,6 +110,10 @@ func validatePropertyType(propertyType any) (Kind, reflect.Type) {
 		return KindArray, nil
 	}
 
+	if _, ok := propertyType.(PackedBitField); ok {
+		return KindBitField, nil
+	}
+
 	if reciever, ok := implementsConverterInterface(propertyType); ok {
 
 		if overwrite, ok := reciever.(OverwriteConverterReciverReflectionInterface); ok {
@@ -134,11 +126,16 @@ func validatePropertyType(propertyType any) (Kind, reflect.Type) {
 	return KindInvalid, nil
 }
 
-func Field[T any](name string, options ...FieldOption) PackedProperty {
+func Field(name string, propertyType any, options ...FieldOption) PackedProperty {
 
 	property := PackedProperty{name: name, tags: make(map[string]string)}
 
-	property.packed = new(T)
+	if packed, ok := propertyType.(PackedStruct); ok {
+		packed.replacePropertiesWithClone()
+		property.packed = packed
+	} else {
+		property.packed = propertyType
+	}
 
 	for _, option := range options {
 		option(&property)
@@ -163,9 +160,9 @@ func Field[T any](name string, options ...FieldOption) PackedProperty {
 		property.converter = &hash
 	}
 
-	property.size = property.packed.(interface{ Size() int }).Size()
-
-	fmt.Println(property.propertyType)
+	if property.kind != KindBitField {
+		property.size = property.packed.(interface{ Size() int }).Size()
+	}
 
 	imported[property.propertyType.PkgPath()] = true
 

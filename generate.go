@@ -49,6 +49,24 @@ func (p *PackedStruct) StructDefinition() []byte {
 		case KindArray:
 			propertyType = property.packed.(PackedArray).recieverType
 
+		case KindBitFieldGroup:
+			group := property.packed.(PackedBitFieldGroup)
+
+			for _, field := range group.fields {
+
+				property := field.packedProperty
+
+				tags := []string{}
+
+				for key, value := range property.tags {
+					tags = append(tags, fmt.Sprintf("`%s:\"%s\"`", key, value))
+				}
+
+				fmt.Fprintf(buffer, "%s %s %s\n", property.name, field.reflection.String(), strings.Join(tags, " "))
+			}
+
+			continue
+
 		default:
 			panic("invalid property kind")
 		}
@@ -86,6 +104,23 @@ func (p *PackedProperty) WriteProperty(buffer *bytes.Buffer, functionName, recie
 		fmt.Fprintf(buffer, "o%d := index + %d\n", *offset, *offset)
 		array.Write(buffer, reciever, functionName, p.littleEndian, fmt.Sprintf("o%d", *offset), 0)
 		*offset += p.size
+		return
+
+	case KindBitFieldGroup:
+		group := p.packed.(PackedBitFieldGroup)
+
+		offsetString := fmt.Sprintf("index + %d", *offset)
+
+		switch functionName {
+		case "ToBytes":
+			group.WriteToBytes(buffer, reciever, endian, offsetString)
+		case "FromBytes":
+			group.WriteFromBytes(buffer, reciever, endian, offsetString)
+		default:
+			panic("invalid function name")
+		}
+
+		*offset += group.size
 		return
 
 	default:

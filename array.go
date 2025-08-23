@@ -36,6 +36,11 @@ func getArrayRecieverType(propertyType any) string {
 func Array(length int, elementType any) PackedArray {
 
 	kind, _ := validatePropertyType(elementType)
+
+	if kind == KindBitField {
+		panic("bit fields as direct array elements are not supported")
+	}
+
 	recieverType := fmt.Sprintf("[%d]%s", length, getArrayRecieverType(elementType))
 	elementSize := elementType.(interface{ Size() int }).Size()
 
@@ -76,16 +81,28 @@ func (p *PackedProperty) WriteArrayElement(buffer *bytes.Buffer, functionName, r
 		fmt.Fprintf(buffer, "%s.%s%s(bytes, %s)\n", reciever, functionName, endian, offsetVariable)
 		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, p.size)
 
+	case KindBitFieldGroup:
+		group := p.packed.(PackedBitFieldGroup)
+
+		switch functionName {
+		case "ToBytes":
+			group.WriteToBytes(buffer, reciever, endian, offsetVariable)
+		case "FromBytes":
+			group.WriteFromBytes(buffer, reciever, endian, offsetVariable)
+		}
+
+		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, group.size)
+
 	case KindInvalid:
 		panic("invalid property kind")
 	}
 }
 
-func (a PackedArray) Write(buffer *bytes.Buffer, recieverVar string, functionName string, littleEndian bool, offsetVariable string, depth int) {
+func (a PackedArray) Write(buffer *bytes.Buffer, recieverVariable string, functionName string, littleEndian bool, offsetVariable string, depth int) {
 
 	indexVariable := fmt.Sprintf("i%d", depth)
 
-	recieverVar = fmt.Sprintf("%s[%s]", recieverVar, indexVariable)
+	recieverVariable = fmt.Sprintf("%s[%s]", recieverVariable, indexVariable)
 
 	fmt.Fprintf(buffer, "for %s := 0; %s < %d; %s++ {\n", indexVariable, indexVariable, a.Length, indexVariable)
 
@@ -100,19 +117,19 @@ func (a PackedArray) Write(buffer *bytes.Buffer, recieverVar string, functionNam
 	case KindStruct:
 		childStruct := a.Element.(PackedStruct)
 		for _, property := range childStruct.properties {
-			property.WriteArrayElement(buffer, functionName, recieverVar, offsetVariable, depth)
+			property.WriteArrayElement(buffer, functionName, recieverVariable, offsetVariable, depth)
 		}
 
 	case KindConverter:
 		hash := createConverterHash(a.Element)
-		fmt.Fprintf(buffer, "%s.%s%s(&%s, bytes, %s)\n", getConverterName(hash.hash), functionName, endian, recieverVar, offsetVariable)
+		fmt.Fprintf(buffer, "%s.%s%s(&%s, bytes, %s)\n", getConverterName(hash.hash), functionName, endian, recieverVariable, offsetVariable)
 		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, a.ElementSize)
 
 	case KindArray:
-		a.Element.(PackedArray).Write(buffer, recieverVar, functionName, littleEndian, offsetVariable, depth+1)
+		a.Element.(PackedArray).Write(buffer, recieverVariable, functionName, littleEndian, offsetVariable, depth+1)
 
 	case KindType:
-		fmt.Fprintf(buffer, "%s.%s%s(bytes, %s)\n", recieverVar, functionName, endian, offsetVariable)
+		fmt.Fprintf(buffer, "%s.%s%s(bytes, %s)\n", recieverVariable, functionName, endian, offsetVariable)
 		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, a.ElementSize)
 
 	default:
