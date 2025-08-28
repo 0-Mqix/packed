@@ -8,25 +8,299 @@ import (
 )
 
 var (
-	// packed.Uint8Converter
-	c0 = &packed.Uint8Converter{}
-	// packed.Uint16Converter
-	c1 = &packed.Uint16Converter{}
-	// packed.Int8Converter
-	c2 = &packed.Int8Converter{}
+	// types.ExampleConverter
+	c0 = &types.ExampleConverter{}
 	// packed.Int16Converter
-	c3 = &packed.Int16Converter{}
-	// packed.Int32Converter
-	c4 = &packed.Int32Converter{}
+	c1 = &packed.Int16Converter{}
 	// packed.StringConverter length: 1
-	c5 = &packed.StringConverter{Length: 1}
+	c2 = &packed.StringConverter{Length: 1}
+	// packed.Int32Converter
+	c3 = &packed.Int32Converter{}
+	// packed.Uint8Converter
+	c4 = &packed.Uint8Converter{}
+	// packed.Uint16Converter
+	c5 = &packed.Uint16Converter{}
 	// packed.Uint32Converter
 	c6 = &packed.Uint32Converter{}
 	// packed.Int64Converter
 	c7 = &packed.Int64Converter{}
-	// types.ExampleConverter
-	c8 = &types.ExampleConverter{}
+	// packed.Int8Converter
+	c8 = &packed.Int8Converter{}
 )
+
+type F struct {
+	A [2][2][2]types.ExampleTypeInterface
+}
+
+func (reciever *F) Size() int {
+	return 8
+}
+
+func (reciever *F) ToBytes(bytes []byte, index int) {
+	o0 := index + 0
+	for i0 := 0; i0 < 2; i0++ {
+		for i1 := 0; i1 < 2; i1++ {
+			for i2 := 0; i2 < 2; i2++ {
+				reciever.A[i0][i1][i2].ToBytesLittleEndian(bytes, o0)
+				o0 += 1
+			}
+		}
+	}
+}
+
+func (reciever *F) FromBytes(bytes []byte, index int) {
+	o0 := index + 0
+	for i0 := 0; i0 < 2; i0++ {
+		for i1 := 0; i1 < 2; i1++ {
+			for i2 := 0; i2 < 2; i2++ {
+				reciever.A[i0][i1][i2].FromBytesLittleEndian(bytes, o0)
+				o0 += 1
+			}
+		}
+	}
+}
+
+type G struct {
+	A [2][2][2]types.ExampleRecieverType
+}
+
+func (reciever *G) Size() int {
+	return 8
+}
+
+func (reciever *G) ToBytes(bytes []byte, index int) {
+	o0 := index + 0
+	for i0 := 0; i0 < 2; i0++ {
+		for i1 := 0; i1 < 2; i1++ {
+			for i2 := 0; i2 < 2; i2++ {
+				c0.ToBytesLittleEndian(&reciever.A[i0][i1][i2], bytes, o0)
+				o0 += 1
+			}
+		}
+	}
+}
+
+func (reciever *G) FromBytes(bytes []byte, index int) {
+	o0 := index + 0
+	for i0 := 0; i0 < 2; i0++ {
+		for i1 := 0; i1 < 2; i1++ {
+			for i2 := 0; i2 < 2; i2++ {
+				c0.FromBytesLittleEndian(&reciever.A[i0][i1][i2], bytes, o0)
+				o0 += 1
+			}
+		}
+	}
+}
+
+type H struct {
+	A types.ExampleEnum
+}
+
+func (reciever *H) Size() int {
+	return 2
+}
+
+func (reciever *H) ToBytes(bytes []byte, index int) {
+	var r0 int16
+	r0 = int16(reciever.A)
+	c1.ToBytesBigEndian(&r0, bytes, index+0)
+}
+
+func (reciever *H) FromBytes(bytes []byte, index int) {
+	var r0 int16
+	c1.FromBytesBigEndian(&r0, bytes, index+0)
+	reciever.A = types.ExampleEnum(r0)
+}
+
+type I struct {
+	A types.ExampleEnum
+	B [2]types.ExampleEnum
+	C [2]H
+	D types.ExampleEnumString
+}
+
+func (reciever *I) Size() int {
+	return 11
+}
+
+func (reciever *I) ToBytes(bytes []byte, index int) {
+	var r0 int32
+	var r1 int8
+	var r2 int16
+	var r3 string
+	r0 = int32(reciever.A)
+	c3.ToBytesLittleEndian(&r0, bytes, index+0)
+	o4 := index + 4
+	for i0 := 0; i0 < 2; i0++ {
+		r1 = int8(reciever.B[i0])
+		c8.ToBytesLittleEndian(&r1, bytes, o4)
+		o4 += 1
+	}
+	o6 := index + 6
+	for i0 := 0; i0 < 2; i0++ {
+		r2 = int16(reciever.C[i0].A)
+		c1.ToBytesBigEndian(&r2, bytes, o6)
+		o6 += 2
+	}
+	r3 = string(reciever.D)
+	c2.ToBytesLittleEndian(&r3, bytes, index+10)
+}
+
+func (reciever *I) FromBytes(bytes []byte, index int) {
+	var r0 int32
+	var r1 int8
+	var r2 int16
+	var r3 string
+	c3.FromBytesLittleEndian(&r0, bytes, index+0)
+	reciever.A = types.ExampleEnum(r0)
+	o4 := index + 4
+	for i0 := 0; i0 < 2; i0++ {
+		c8.FromBytesLittleEndian(&r1, bytes, o4)
+		reciever.B[i0] = types.ExampleEnum(r1)
+		o4 += 1
+	}
+	o6 := index + 6
+	for i0 := 0; i0 < 2; i0++ {
+		c1.FromBytesBigEndian(&r2, bytes, o6)
+		reciever.C[i0].A = types.ExampleEnum(r2)
+		o6 += 2
+	}
+	c2.FromBytesLittleEndian(&r3, bytes, index+10)
+	reciever.D = types.ExampleEnumString(r3)
+}
+
+type D struct {
+	A B
+	B C
+}
+
+func (reciever *D) Size() int {
+	return 18
+}
+
+func (reciever *D) ToBytes(bytes []byte, index int) {
+	var b0 uint64
+	b0 |= (uint64(reciever.A.A) & 0xF)
+	b0 |= (uint64(reciever.A.B) & 0x3FF) << 4
+	b0 |= (uint64(reciever.A.C) & 0xFFFFF) << 14
+	b0 |= (uint64(reciever.A.D) & 0x3FFFFFFF) << 34
+	bytes[index+0+0] = byte(b0 >> 0)
+	bytes[index+0+1] = byte(b0 >> 8)
+	bytes[index+0+2] = byte(b0 >> 16)
+	bytes[index+0+3] = byte(b0 >> 24)
+	bytes[index+0+4] = byte(b0 >> 32)
+	bytes[index+0+5] = byte(b0 >> 40)
+	bytes[index+0+6] = byte(b0 >> 48)
+	bytes[index+0+7] = byte(b0 >> 56)
+	var b1 uint64
+	b1 |= (uint64(reciever.A.E) & 0xF)
+	b1 |= (uint64(reciever.A.F) & 0xF) << 4
+	bytes[index+8+0] = byte(b1 >> 0)
+	var b2 uint64
+	b2 |= (uint64(reciever.B.A) & 0xF)
+	b2 |= (uint64(reciever.B.B) & 0x3FF) << 4
+	b2 |= (uint64(reciever.B.C) & 0xFFFFF) << 14
+	b2 |= (uint64(reciever.B.D) & 0x3FFFFFFF) << 34
+	bytes[index+9+0] = byte(b2 >> 0)
+	bytes[index+9+1] = byte(b2 >> 8)
+	bytes[index+9+2] = byte(b2 >> 16)
+	bytes[index+9+3] = byte(b2 >> 24)
+	bytes[index+9+4] = byte(b2 >> 32)
+	bytes[index+9+5] = byte(b2 >> 40)
+	bytes[index+9+6] = byte(b2 >> 48)
+	bytes[index+9+7] = byte(b2 >> 56)
+	var b3 uint64
+	b3 |= (uint64(reciever.B.E) & 0xF)
+	b3 |= (uint64(reciever.B.F) & 0xF) << 4
+	bytes[index+17+0] = byte(b3 >> 0)
+}
+
+func (reciever *D) FromBytes(bytes []byte, index int) {
+	var b0 uint64
+	b0 |= uint64(bytes[index+0+0]) << 0
+	b0 |= uint64(bytes[index+0+1]) << 8
+	b0 |= uint64(bytes[index+0+2]) << 16
+	b0 |= uint64(bytes[index+0+3]) << 24
+	b0 |= uint64(bytes[index+0+4]) << 32
+	b0 |= uint64(bytes[index+0+5]) << 40
+	b0 |= uint64(bytes[index+0+6]) << 48
+	b0 |= uint64(bytes[index+0+7]) << 56
+	reciever.A.A = uint8(uint64((b0 >> 0) & 0xF))
+	reciever.A.B = uint16(uint64((b0 >> 4) & 0x3FF))
+	reciever.A.C = uint32(uint64((b0 >> 14) & 0xFFFFF))
+	reciever.A.D = int64((((b0 >> 34) & 0x3FFFFFFF) ^ (1 << 29)) - (1 << 29))
+	var b1 uint64
+	b1 |= uint64(bytes[index+8+0]) << 0
+	reciever.A.E = int8((((b1 >> 0) & 0xF) ^ (1 << 3)) - (1 << 3))
+	reciever.A.F = int8((((b1 >> 4) & 0xF) ^ (1 << 3)) - (1 << 3))
+	var b2 uint64
+	b2 |= uint64(bytes[index+9+0]) << 0
+	b2 |= uint64(bytes[index+9+1]) << 8
+	b2 |= uint64(bytes[index+9+2]) << 16
+	b2 |= uint64(bytes[index+9+3]) << 24
+	b2 |= uint64(bytes[index+9+4]) << 32
+	b2 |= uint64(bytes[index+9+5]) << 40
+	b2 |= uint64(bytes[index+9+6]) << 48
+	b2 |= uint64(bytes[index+9+7]) << 56
+	reciever.B.A = uint8(uint64((b2 >> 0) & 0xF))
+	reciever.B.B = uint16(uint64((b2 >> 4) & 0x3FF))
+	reciever.B.C = uint32(uint64((b2 >> 14) & 0xFFFFF))
+	reciever.B.D = int64((((b2 >> 34) & 0x3FFFFFFF) ^ (1 << 29)) - (1 << 29))
+	var b3 uint64
+	b3 |= uint64(bytes[index+17+0]) << 0
+	reciever.B.E = int8((((b3 >> 0) & 0xF) ^ (1 << 3)) - (1 << 3))
+	reciever.B.F = int8((((b3 >> 4) & 0xF) ^ (1 << 3)) - (1 << 3))
+}
+
+type J struct {
+	A uint8
+	B types.ExampleBitsType
+}
+
+func (reciever *J) Size() int {
+	return 2
+}
+
+func (reciever *J) ToBytes(bytes []byte, index int) {
+	var b0 uint64
+	b0 |= (uint64(reciever.A) & 0x3F)
+	b0 |= (uint64(reciever.B.Integer()) & 0x3FF) << 6
+	bytes[index+0+0] = byte(b0 >> 0)
+	bytes[index+0+1] = byte(b0 >> 8)
+}
+
+func (reciever *J) FromBytes(bytes []byte, index int) {
+	var b0 uint64
+	b0 |= uint64(bytes[index+0+0]) << 0
+	b0 |= uint64(bytes[index+0+1]) << 8
+	reciever.A = uint8(uint64((b0 >> 0) & 0x3F))
+	reciever.B.Set(uint16(uint64((b0 >> 6) & 0x3FF)))
+}
+
+type K struct {
+	A uint8
+	B types.ExampleBitsType
+}
+
+func (reciever *K) Size() int {
+	return 2
+}
+
+func (reciever *K) ToBytes(bytes []byte, index int) {
+	var b0 uint64
+	b0 |= (uint64(reciever.A) & 0x3F) << 10
+	b0 |= (uint64(reciever.B.Integer()) & 0x3FF)
+	bytes[index+0+1] = byte(b0 >> 0)
+	bytes[index+0+0] = byte(b0 >> 8)
+}
+
+func (reciever *K) FromBytes(bytes []byte, index int) {
+	var b0 uint64
+	b0 |= uint64(bytes[index+0+1]) << 0
+	b0 |= uint64(bytes[index+0+0]) << 8
+	reciever.A = uint8(uint64((b0 >> 10) & 0x3F))
+	reciever.B.Set(uint16(uint64((b0 >> 0) & 0x3FF)))
+}
 
 type A struct {
 	A uint8  `json:"a" xml:"a"`
@@ -43,22 +317,22 @@ func (reciever *A) Size() int {
 }
 
 func (reciever *A) ToBytes(bytes []byte, index int) {
-	c0.ToBytesLittleEndian(&reciever.A, bytes, index+0)
-	c1.ToBytesLittleEndian(&reciever.B, bytes, index+1)
+	c4.ToBytesLittleEndian(&reciever.A, bytes, index+0)
+	c5.ToBytesLittleEndian(&reciever.B, bytes, index+1)
 	c6.ToBytesLittleEndian(&reciever.C, bytes, index+3)
 	c7.ToBytesLittleEndian(&reciever.D, bytes, index+7)
-	c2.ToBytesLittleEndian(&reciever.E, bytes, index+15)
-	c2.ToBytesLittleEndian(&reciever.F, bytes, index+16)
+	c8.ToBytesLittleEndian(&reciever.E, bytes, index+15)
+	c8.ToBytesLittleEndian(&reciever.F, bytes, index+16)
 	reciever.G.ToBytesLittleEndian(bytes, index+17)
 }
 
 func (reciever *A) FromBytes(bytes []byte, index int) {
-	c0.FromBytesLittleEndian(&reciever.A, bytes, index+0)
-	c1.FromBytesLittleEndian(&reciever.B, bytes, index+1)
+	c4.FromBytesLittleEndian(&reciever.A, bytes, index+0)
+	c5.FromBytesLittleEndian(&reciever.B, bytes, index+1)
 	c6.FromBytesLittleEndian(&reciever.C, bytes, index+3)
 	c7.FromBytesLittleEndian(&reciever.D, bytes, index+7)
-	c2.FromBytesLittleEndian(&reciever.E, bytes, index+15)
-	c2.FromBytesLittleEndian(&reciever.F, bytes, index+16)
+	c8.FromBytesLittleEndian(&reciever.E, bytes, index+15)
+	c8.FromBytesLittleEndian(&reciever.F, bytes, index+16)
 	reciever.G.FromBytesLittleEndian(bytes, index+17)
 }
 
@@ -168,141 +442,6 @@ func (reciever *C) FromBytes(bytes []byte, index int) {
 	reciever.F = int8((((b1 >> 4) & 0xF) ^ (1 << 3)) - (1 << 3))
 }
 
-type D struct {
-	A B
-	B C
-}
-
-func (reciever *D) Size() int {
-	return 18
-}
-
-func (reciever *D) ToBytes(bytes []byte, index int) {
-	var b0 uint64
-	b0 |= (uint64(reciever.A.A) & 0xF)
-	b0 |= (uint64(reciever.A.B) & 0x3FF) << 4
-	b0 |= (uint64(reciever.A.C) & 0xFFFFF) << 14
-	b0 |= (uint64(reciever.A.D) & 0x3FFFFFFF) << 34
-	bytes[index+0+0] = byte(b0 >> 0)
-	bytes[index+0+1] = byte(b0 >> 8)
-	bytes[index+0+2] = byte(b0 >> 16)
-	bytes[index+0+3] = byte(b0 >> 24)
-	bytes[index+0+4] = byte(b0 >> 32)
-	bytes[index+0+5] = byte(b0 >> 40)
-	bytes[index+0+6] = byte(b0 >> 48)
-	bytes[index+0+7] = byte(b0 >> 56)
-	var b1 uint64
-	b1 |= (uint64(reciever.A.E) & 0xF)
-	b1 |= (uint64(reciever.A.F) & 0xF) << 4
-	bytes[index+8+0] = byte(b1 >> 0)
-	var b2 uint64
-	b2 |= (uint64(reciever.B.A) & 0xF)
-	b2 |= (uint64(reciever.B.B) & 0x3FF) << 4
-	b2 |= (uint64(reciever.B.C) & 0xFFFFF) << 14
-	b2 |= (uint64(reciever.B.D) & 0x3FFFFFFF) << 34
-	bytes[index+9+0] = byte(b2 >> 0)
-	bytes[index+9+1] = byte(b2 >> 8)
-	bytes[index+9+2] = byte(b2 >> 16)
-	bytes[index+9+3] = byte(b2 >> 24)
-	bytes[index+9+4] = byte(b2 >> 32)
-	bytes[index+9+5] = byte(b2 >> 40)
-	bytes[index+9+6] = byte(b2 >> 48)
-	bytes[index+9+7] = byte(b2 >> 56)
-	var b3 uint64
-	b3 |= (uint64(reciever.B.E) & 0xF)
-	b3 |= (uint64(reciever.B.F) & 0xF) << 4
-	bytes[index+17+0] = byte(b3 >> 0)
-}
-
-func (reciever *D) FromBytes(bytes []byte, index int) {
-	var b0 uint64
-	b0 |= uint64(bytes[index+0+0]) << 0
-	b0 |= uint64(bytes[index+0+1]) << 8
-	b0 |= uint64(bytes[index+0+2]) << 16
-	b0 |= uint64(bytes[index+0+3]) << 24
-	b0 |= uint64(bytes[index+0+4]) << 32
-	b0 |= uint64(bytes[index+0+5]) << 40
-	b0 |= uint64(bytes[index+0+6]) << 48
-	b0 |= uint64(bytes[index+0+7]) << 56
-	reciever.A.A = uint8(uint64((b0 >> 0) & 0xF))
-	reciever.A.B = uint16(uint64((b0 >> 4) & 0x3FF))
-	reciever.A.C = uint32(uint64((b0 >> 14) & 0xFFFFF))
-	reciever.A.D = int64((((b0 >> 34) & 0x3FFFFFFF) ^ (1 << 29)) - (1 << 29))
-	var b1 uint64
-	b1 |= uint64(bytes[index+8+0]) << 0
-	reciever.A.E = int8((((b1 >> 0) & 0xF) ^ (1 << 3)) - (1 << 3))
-	reciever.A.F = int8((((b1 >> 4) & 0xF) ^ (1 << 3)) - (1 << 3))
-	var b2 uint64
-	b2 |= uint64(bytes[index+9+0]) << 0
-	b2 |= uint64(bytes[index+9+1]) << 8
-	b2 |= uint64(bytes[index+9+2]) << 16
-	b2 |= uint64(bytes[index+9+3]) << 24
-	b2 |= uint64(bytes[index+9+4]) << 32
-	b2 |= uint64(bytes[index+9+5]) << 40
-	b2 |= uint64(bytes[index+9+6]) << 48
-	b2 |= uint64(bytes[index+9+7]) << 56
-	reciever.B.A = uint8(uint64((b2 >> 0) & 0xF))
-	reciever.B.B = uint16(uint64((b2 >> 4) & 0x3FF))
-	reciever.B.C = uint32(uint64((b2 >> 14) & 0xFFFFF))
-	reciever.B.D = int64((((b2 >> 34) & 0x3FFFFFFF) ^ (1 << 29)) - (1 << 29))
-	var b3 uint64
-	b3 |= uint64(bytes[index+17+0]) << 0
-	reciever.B.E = int8((((b3 >> 0) & 0xF) ^ (1 << 3)) - (1 << 3))
-	reciever.B.F = int8((((b3 >> 4) & 0xF) ^ (1 << 3)) - (1 << 3))
-}
-
-type F struct {
-	A [2][2][2]types.ExampleTypeInterface
-}
-
-func (reciever *F) Size() int {
-	return 8
-}
-
-func (reciever *F) ToBytes(bytes []byte, index int) {
-	o0 := index + 0
-	for i0 := 0; i0 < 2; i0++ {
-		for i1 := 0; i1 < 2; i1++ {
-			for i2 := 0; i2 < 2; i2++ {
-				reciever.A[i0][i1][i2].ToBytesLittleEndian(bytes, o0)
-				o0 += 1
-			}
-		}
-	}
-}
-
-func (reciever *F) FromBytes(bytes []byte, index int) {
-	o0 := index + 0
-	for i0 := 0; i0 < 2; i0++ {
-		for i1 := 0; i1 < 2; i1++ {
-			for i2 := 0; i2 < 2; i2++ {
-				reciever.A[i0][i1][i2].FromBytesLittleEndian(bytes, o0)
-				o0 += 1
-			}
-		}
-	}
-}
-
-type H struct {
-	A types.ExampleEnum
-}
-
-func (reciever *H) Size() int {
-	return 2
-}
-
-func (reciever *H) ToBytes(bytes []byte, index int) {
-	var r0 int16
-	r0 = int16(reciever.A)
-	c3.ToBytesBigEndian(&r0, bytes, index+0)
-}
-
-func (reciever *H) FromBytes(bytes []byte, index int) {
-	var r0 int16
-	c3.FromBytesBigEndian(&r0, bytes, index+0)
-	reciever.A = types.ExampleEnum(r0)
-}
-
 type E struct {
 	A [2]D
 }
@@ -397,93 +536,4 @@ func (reciever *E) FromBytes(bytes []byte, index int) {
 		reciever.A[i0].B.F = int8((((b3 >> 4) & 0xF) ^ (1 << 3)) - (1 << 3))
 		o0 += 1
 	}
-}
-
-type G struct {
-	A [2][2][2]types.ExampleRecieverType
-}
-
-func (reciever *G) Size() int {
-	return 8
-}
-
-func (reciever *G) ToBytes(bytes []byte, index int) {
-	o0 := index + 0
-	for i0 := 0; i0 < 2; i0++ {
-		for i1 := 0; i1 < 2; i1++ {
-			for i2 := 0; i2 < 2; i2++ {
-				c8.ToBytesLittleEndian(&reciever.A[i0][i1][i2], bytes, o0)
-				o0 += 1
-			}
-		}
-	}
-}
-
-func (reciever *G) FromBytes(bytes []byte, index int) {
-	o0 := index + 0
-	for i0 := 0; i0 < 2; i0++ {
-		for i1 := 0; i1 < 2; i1++ {
-			for i2 := 0; i2 < 2; i2++ {
-				c8.FromBytesLittleEndian(&reciever.A[i0][i1][i2], bytes, o0)
-				o0 += 1
-			}
-		}
-	}
-}
-
-type I struct {
-	A types.ExampleEnum
-	B [2]types.ExampleEnum
-	C [2]H
-	D types.ExampleEnumString
-}
-
-func (reciever *I) Size() int {
-	return 11
-}
-
-func (reciever *I) ToBytes(bytes []byte, index int) {
-	var r0 int32
-	var r1 int8
-	var r2 int16
-	var r3 string
-	r0 = int32(reciever.A)
-	c4.ToBytesLittleEndian(&r0, bytes, index+0)
-	o4 := index + 4
-	for i0 := 0; i0 < 2; i0++ {
-		r1 = int8(reciever.B[i0])
-		c2.ToBytesLittleEndian(&r1, bytes, o4)
-		o4 += 1
-	}
-	o6 := index + 6
-	for i0 := 0; i0 < 2; i0++ {
-		r2 = int16(reciever.C[i0].A)
-		c3.ToBytesBigEndian(&r2, bytes, o6)
-		o6 += 2
-	}
-	r3 = string(reciever.D)
-	c5.ToBytesLittleEndian(&r3, bytes, index+10)
-}
-
-func (reciever *I) FromBytes(bytes []byte, index int) {
-	var r2 int16
-	var r3 string
-	var r0 int32
-	var r1 int8
-	c4.FromBytesLittleEndian(&r0, bytes, index+0)
-	reciever.A = types.ExampleEnum(r0)
-	o4 := index + 4
-	for i0 := 0; i0 < 2; i0++ {
-		c2.FromBytesLittleEndian(&r1, bytes, o4)
-		reciever.B[i0] = types.ExampleEnum(r1)
-		o4 += 1
-	}
-	o6 := index + 6
-	for i0 := 0; i0 < 2; i0++ {
-		c3.FromBytesBigEndian(&r2, bytes, o6)
-		reciever.C[i0].A = types.ExampleEnum(r2)
-		o6 += 2
-	}
-	c5.FromBytesLittleEndian(&r3, bytes, index+10)
-	reciever.D = types.ExampleEnumString(r3)
 }

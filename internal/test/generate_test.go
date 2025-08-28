@@ -164,7 +164,7 @@ func TestMatrixOfExampleTypeInterface(t *testing.T) {
 
 func TestMatrixOfExampleConverterBitArray(t *testing.T) {
 
-	g := G{
+	definition := G{
 		A: [2][2][2]types.ExampleRecieverType{
 			{
 				{{A: 1}, {A: 2}},
@@ -177,14 +177,14 @@ func TestMatrixOfExampleConverterBitArray(t *testing.T) {
 		},
 	}
 
-	bytesG := make([]byte, g.Size())
-	g.ToBytes(bytesG, 0)
+	bytes := make([]byte, definition.Size())
+	definition.ToBytes(bytes, 0)
 
-	var resultG G
-	resultG.FromBytes(bytesG, 0)
+	result := G{}
+	result.FromBytes(bytes, 0)
 
-	if !reflect.DeepEqual(g, resultG) {
-		t.Errorf("g: expected %v, got %v", g, resultG)
+	if !reflect.DeepEqual(definition, result) {
+		t.Errorf("g: expected %v, got %v", definition, result)
 	}
 }
 
@@ -208,5 +208,38 @@ func TestConverterCast(t *testing.T) {
 
 	if !reflect.DeepEqual(definition, result) {
 		t.Errorf("i: expected %v, got %v", definition, result)
+	}
+}
+
+func TestBitsType(t *testing.T) {
+
+	definitionJ := J{
+		A: 4,
+		B: types.ExampleBitsType{true, false, false, true},
+	}
+
+	definitionK := K{
+		A: 4,
+		B: types.ExampleBitsType{true, false, false, true},
+	}
+
+	bytes := make([]byte, definitionJ.Size())
+	definitionJ.ToBytes(bytes, 0)
+
+	bytesK := make([]byte, definitionK.Size())
+	definitionK.ToBytes(bytesK, 0)
+
+	var resultJ J
+	var resultK K
+
+	resultJ.FromBytes(bytes, 0)
+	resultK.FromBytes(bytesK, 0)
+
+	if !reflect.DeepEqual(definitionJ, resultJ) {
+		t.Errorf("j: expected %v, got %v", definitionJ, resultJ)
+	}
+
+	if !reflect.DeepEqual(definitionK, resultK) {
+		t.Errorf("k: expected %v, got %v", definitionK, resultK)
 	}
 }

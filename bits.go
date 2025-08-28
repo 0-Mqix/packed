@@ -32,9 +32,11 @@ func initPackedBitFieldGroup(groupIndex int, fields []packedBitField) packedBitF
 }
 
 type packedBitField struct {
-	bitSize        int
-	reflection     reflect.Type
-	packedProperty packedProperty
+	bitSize            int
+	reflection         reflect.Type
+	packedProperty     packedProperty
+	bitsType           bool
+	bitsTypeReflection reflect.Type
 }
 
 func (p packedBitField) signed() bool {
@@ -48,13 +50,36 @@ func (p packedBitField) signed() bool {
 	}
 }
 
-func Bits[T constraints.Integer](bits int) packedBitField {
-	var value T
+type bitsType[Integer constraints.Integer] interface {
+	Set(Integer)
+	Integer() Integer
+}
+
+func Bits[Interger constraints.Integer](bits int, bitsType ...bitsType[Interger]) packedBitField {
+	var value Interger
+
 	size := unsafe.Sizeof(value) * 8
 	if bits > int(size) {
 		panic("bits cannot be larger than the underlying type size")
 	}
-	return packedBitField{bitSize: bits, reflection: reflect.TypeOf(value)}
+
+	field := packedBitField{bitSize: bits, reflection: reflect.TypeOf(value)}
+
+	if len(bitsType) != 0 {
+
+		if len(bitsType) != 1 {
+			panic("bits type must be a single type")
+		}
+
+		if bitsType[0] == nil {
+			panic("bits type cannot be nil")
+		}
+
+		field.bitsType = true
+		field.bitsTypeReflection = reflect.TypeOf(bitsType[0])
+	}
+
+	return field
 }
 
 func (g packedBitFieldGroup) writeToBytes(
@@ -67,7 +92,13 @@ func (g packedBitFieldGroup) writeToBytes(
 	if littleEndian {
 		runningOffset := 0
 		for _, field := range g.fields {
+
 			receiver := receiverVariable + field.packedProperty.name
+
+			if field.bitsType {
+				receiver += ".Integer()"
+			}
+
 			mask := (uint64(1) << field.bitSize) - 1
 			bitOffset := runningOffset
 			if bitOffset == 0 {
@@ -91,7 +122,13 @@ func (g packedBitFieldGroup) writeToBytes(
 	} else {
 		remainingBits := g.size * 8
 		for _, field := range g.fields {
+
 			receiver := receiverVariable + field.packedProperty.name
+
+			if field.bitsType {
+				receiver += ".Integer()"
+			}
+
 			mask := (uint64(1) << field.bitSize) - 1
 			bitOffset := remainingBits - field.bitSize
 			if bitOffset == 0 {
@@ -167,13 +204,20 @@ func (g packedBitFieldGroup) writeFromBytes(
 	if littleEndian {
 		runningOffset := 0
 		for _, field := range g.fields {
+
 			receiver := receiverVariable + field.packedProperty.name
+
+			if field.bitsType {
+				fmt.Fprintf(buffer, "%s.Set(", receiver)
+			} else {
+				fmt.Fprintf(buffer, "%s = ", receiver)
+			}
+
 			mask := (uint64(1) << field.bitSize) - 1
 			bitOffset := runningOffset
 			if field.signed() {
 				fmt.Fprintf(buffer,
-					"%s = %s((( (b%d >> %d) & 0x%X ) ^ (1 << %d)) - (1 << %d))\n",
-					receiver,
+					"%s((( (b%d >> %d) & 0x%X ) ^ (1 << %d)) - (1 << %d))",
 					field.reflection.String(),
 					g.groupIndex,
 					bitOffset,
@@ -183,8 +227,7 @@ func (g packedBitFieldGroup) writeFromBytes(
 				)
 			} else {
 				fmt.Fprintf(buffer,
-					"%s = %s(uint64((b%d >> %d) & 0x%X))\n",
-					receiver,
+					"%s(uint64((b%d >> %d) & 0x%X))",
 					field.reflection.String(),
 					g.groupIndex,
 					bitOffset,
@@ -192,17 +235,30 @@ func (g packedBitFieldGroup) writeFromBytes(
 				)
 			}
 			runningOffset += field.bitSize
+
+			if field.bitsType {
+				fmt.Fprintf(buffer, ")\n")
+			} else {
+				fmt.Fprintf(buffer, "\n")
+			}
 		}
 	} else {
 		remainingBits := g.size * 8
 		for _, field := range g.fields {
+
 			receiver := receiverVariable + field.packedProperty.name
+
+			if field.bitsType {
+				fmt.Fprintf(buffer, "%s.Set(", receiver)
+			} else {
+				fmt.Fprintf(buffer, "%s = ", receiver)
+			}
+
 			mask := (uint64(1) << field.bitSize) - 1
 			bitOffset := remainingBits - field.bitSize
 			if field.signed() {
 				fmt.Fprintf(buffer,
-					"%s = %s((( (b%d >> %d) & 0x%X ) ^ (1 << %d)) - (1 << %d))\n",
-					receiver,
+					"%s((( (b%d >> %d) & 0x%X ) ^ (1 << %d)) - (1 << %d))",
 					field.reflection.String(),
 					g.groupIndex,
 					bitOffset,
@@ -212,14 +268,20 @@ func (g packedBitFieldGroup) writeFromBytes(
 				)
 			} else {
 				fmt.Fprintf(buffer,
-					"%s = %s(uint64((b%d >> %d) & 0x%X))\n",
-					receiver,
+					"%s(uint64((b%d >> %d) & 0x%X))",
 					field.reflection.String(),
 					g.groupIndex,
 					bitOffset,
 					mask,
 				)
 			}
+
+			if field.bitsType {
+				fmt.Fprintf(buffer, ")\n")
+			} else {
+				fmt.Fprintf(buffer, "\n")
+			}
+
 			remainingBits -= field.bitSize
 		}
 	}

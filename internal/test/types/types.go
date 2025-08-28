@@ -65,3 +65,23 @@ func (o *ExampleConverter) ToBytesBigEndian(reciever *ExampleRecieverType, bytes
 func (o *ExampleConverter) FromBytesBigEndian(reciever *ExampleRecieverType, bytes []byte, index int) {
 	reciever.A = int(bytes[index])
 }
+
+type ExampleBitsType [10]bool
+
+func (o *ExampleBitsType) Set(integer uint16) {
+	for i := range 10 {
+		o[i] = (integer & (1 << i)) != 0
+	}
+}
+
+func (o *ExampleBitsType) Integer() uint16 {
+	var integer uint16
+
+	for i := range 10 {
+		if o[i] {
+			integer |= 1 << i
+		}
+	}
+
+	return integer
+}

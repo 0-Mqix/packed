@@ -78,7 +78,13 @@ func (p *packedStruct) structDefinition() []byte {
 					tagString = "`" + strings.Join(tags, " ") + "`"
 				}
 
-				fmt.Fprintf(buffer, "%s %s %s\n", property.name, field.reflection.String(), tagString)
+				reflection := field.reflection
+
+				if field.bitsType {
+					reflection = field.bitsTypeReflection.Elem()
+				}
+
+				fmt.Fprintf(buffer, "%s %s %s\n", property.name, reflection, tagString)
 			}
 
 			continue

@@ -68,6 +68,16 @@ func main() {
 		Field("D", Cast[types.ExampleEnumString](String(1))),
 	)
 
+	Struct("J", true,
+		Field("A", Bits[uint8](6)),
+		Field("B", Bits(10, &types.ExampleBitsType{})),
+	)
+
+	Struct("K", false,
+		Field("A", Bits[uint8](6)),
+		Field("B", Bits(10, &types.ExampleBitsType{})),
+	)
+
 	workingDirectory, _ := os.Getwd()
 
 	generated := path.Join(workingDirectory, "/output.go")
