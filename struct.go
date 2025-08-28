@@ -1,12 +1,16 @@
 package packed
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+)
 
 type PackedStruct struct {
-	name         string
-	properties   []PackedProperty
-	size         int
-	littleEndian bool
+	name                   string
+	properties             []PackedProperty
+	size                   int
+	littleEndian           bool
+	converterCastRecievers map[reflect.Type]int
 }
 
 func (s PackedStruct) Size() int { return s.size }
@@ -48,6 +52,55 @@ func (p *PackedStruct) SetBitFieldGroupIndexes(index *int) {
 		case KindStruct:
 			packed := child.packed.(PackedStruct)
 			packed.SetBitFieldGroupIndexes(index)
+			child.packed = packed
+
+		default:
+			continue
+		}
+
+		p.properties[i] = child
+	}
+}
+
+func (p *PackedStruct) GetConverterCastRecievers(converterCastRecievers map[reflect.Type]int) {
+	for i, child := range p.properties {
+
+		switch child.kind {
+
+		case KindConverterCast:
+			cast := child.packed.(ConverterCast)
+
+			if _, ok := converterCastRecievers[cast.reciever]; !ok {
+				converterCastRecievers[cast.reciever] = len(converterCastRecievers)
+			}
+
+			child.packed = cast
+
+		case KindStruct:
+			packed := child.packed.(PackedStruct)
+			packed.GetConverterCastRecievers(converterCastRecievers)
+			child.packed = packed
+
+		case KindArray:
+			packed := child.packed.(PackedArray)
+
+			switch packed.ElementKind {
+
+			case KindStruct:
+				structure := packed.Element.(PackedStruct)
+				structure.GetConverterCastRecievers(converterCastRecievers)
+				packed.Element = structure
+
+			case KindConverterCast:
+				cast := packed.Element.(ConverterCast)
+
+				if _, ok := converterCastRecievers[cast.reciever]; !ok {
+					converterCastRecievers[cast.reciever] = len(converterCastRecievers)
+				}
+
+				packed.Element = cast
+			}
+
 			child.packed = packed
 
 		default:
@@ -131,17 +184,18 @@ func Struct(name string, littleEndian bool, properties ...PackedProperty) Packed
 	}
 
 	packed := PackedStruct{
-		name:         name,
-		size:         size,
-		littleEndian: littleEndian,
-		properties:   processedProperties,
+		name:                   name,
+		size:                   size,
+		littleEndian:           littleEndian,
+		properties:             processedProperties,
+		converterCastRecievers: map[reflect.Type]int{},
 	}
 
+	bitFieldGroupIndex := 0
+
 	packed.SetEndianProperties(littleEndian, false)
-
-	groupIndex := 0
-
-	packed.SetBitFieldGroupIndexes(&groupIndex)
+	packed.SetBitFieldGroupIndexes(&bitFieldGroupIndex)
+	packed.GetConverterCastRecievers(packed.converterCastRecievers)
 
 	structs[name] = packed
 

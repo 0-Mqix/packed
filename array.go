@@ -61,7 +61,7 @@ func Array(length int, elementType any) PackedArray {
 	}
 }
 
-func (p *PackedProperty) WriteArrayElement(buffer *bytes.Buffer, functionName, recieverPrefix string, offsetVariable string, depth int) {
+func (p *PackedProperty) WriteArrayElement(buffer *bytes.Buffer, structure *PackedStruct, functionName, recieverPrefix string, offsetVariable string, depth int) {
 	endian := "LittleEndian"
 
 	if !p.littleEndian {
@@ -74,16 +74,21 @@ func (p *PackedProperty) WriteArrayElement(buffer *bytes.Buffer, functionName, r
 
 	case KindStruct:
 		for _, child := range p.packed.(PackedStruct).properties {
-			child.WriteArrayElement(buffer, functionName, reciever, offsetVariable, depth)
+			child.WriteArrayElement(buffer, structure, functionName, reciever, offsetVariable, depth)
 		}
 
 	case KindConverter:
 		fmt.Fprintf(buffer, "%s.%s%s(&%s, bytes, %s)\n", getConverterName(p.converter.hash), functionName, endian, reciever, offsetVariable)
 		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, p.size)
 
+	case KindConverterCast:
+		cast := p.packed.(ConverterCast)
+		cast.Write(buffer, structure, reciever, functionName, p.littleEndian, offsetVariable)
+		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, cast.size)
+
 	case KindArray:
 		array := p.packed.(PackedArray)
-		array.Write(buffer, reciever, functionName, p.littleEndian, offsetVariable, depth+1)
+		array.Write(buffer, structure, reciever, functionName, p.littleEndian, offsetVariable, depth+1)
 
 	case KindType:
 		fmt.Fprintf(buffer, "%s.%s%s(bytes, %s)\n", reciever, functionName, endian, offsetVariable)
@@ -101,12 +106,12 @@ func (p *PackedProperty) WriteArrayElement(buffer *bytes.Buffer, functionName, r
 
 		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, group.size)
 
-	case KindInvalid:
+	default:
 		panic("invalid property kind")
 	}
 }
 
-func (a PackedArray) Write(buffer *bytes.Buffer, recieverVariable string, functionName string, littleEndian bool, offsetVariable string, depth int) {
+func (a PackedArray) Write(buffer *bytes.Buffer, structure *PackedStruct, recieverVariable string, functionName string, littleEndian bool, offsetVariable string, depth int) {
 
 	indexVariable := fmt.Sprintf("i%d", depth)
 
@@ -125,7 +130,7 @@ func (a PackedArray) Write(buffer *bytes.Buffer, recieverVariable string, functi
 	case KindStruct:
 		childStruct := a.Element.(PackedStruct)
 		for _, property := range childStruct.properties {
-			property.WriteArrayElement(buffer, functionName, recieverVariable, offsetVariable, depth)
+			property.WriteArrayElement(buffer, structure, functionName, recieverVariable, offsetVariable, depth)
 		}
 
 	case KindConverter:
@@ -133,8 +138,13 @@ func (a PackedArray) Write(buffer *bytes.Buffer, recieverVariable string, functi
 		fmt.Fprintf(buffer, "%s.%s%s(&%s, bytes, %s)\n", getConverterName(hash.hash), functionName, endian, recieverVariable, offsetVariable)
 		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, a.ElementSize)
 
+	case KindConverterCast:
+		cast := a.Element.(ConverterCast)
+		cast.Write(buffer, structure, recieverVariable, functionName, littleEndian, offsetVariable)
+		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, cast.size)
+
 	case KindArray:
-		a.Element.(PackedArray).Write(buffer, recieverVariable, functionName, littleEndian, offsetVariable, depth+1)
+		a.Element.(PackedArray).Write(buffer, structure, recieverVariable, functionName, littleEndian, offsetVariable, depth+1)
 
 	case KindType:
 		fmt.Fprintf(buffer, "%s.%s%s(bytes, %s)\n", recieverVariable, functionName, endian, offsetVariable)

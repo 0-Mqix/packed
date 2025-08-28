@@ -57,8 +57,15 @@ func main() {
 		Field("A", Array(2, Array(2, Array(2, types.ExampleConverter{})))),
 	)
 
-	Struct("H", true,
-		Field("A", types.ExampleEnum(0)),
+	H := Struct("H", false,
+		Field("A", Cast[types.ExampleEnum](Int16)),
+	)
+
+	Struct("I", true,
+		Field("A", Cast[types.ExampleEnum](Int32)),
+		Field("B", Array(2, Cast[types.ExampleEnum](Int8))),
+		Field("C", Array(2, H)),
+		Field("D", Cast[types.ExampleEnumString](String(1))),
 	)
 
 	workingDirectory, _ := os.Getwd()

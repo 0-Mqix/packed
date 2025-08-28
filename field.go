@@ -13,6 +13,7 @@ const (
 	KindType
 	KindStruct
 	KindConverter
+	KindConverterCast
 	KindArray
 	KindBitField
 	KindBitFieldGroup
@@ -73,6 +74,18 @@ func LittleEndian(value bool) FieldOption {
 	}
 }
 
+func structToPointer(structure any) any {
+	value := reflect.ValueOf(structure)
+
+	if value.Kind() != reflect.Struct {
+		return structure
+	}
+
+	pointer := reflect.New(value.Type())
+	pointer.Elem().Set(value)
+	return pointer.Interface()
+}
+
 func validatePropertyType(propertyType any) (Kind, reflect.Type, any) {
 
 	if _, ok := propertyType.(PackedStruct); ok {
@@ -87,13 +100,11 @@ func validatePropertyType(propertyType any) (Kind, reflect.Type, any) {
 		return KindBitField, nil, propertyType
 	}
 
-	value := reflect.ValueOf(propertyType)
-
-	if value.Kind() == reflect.Struct {
-		pointer := reflect.New(value.Type())
-		pointer.Elem().Set(value)
-		propertyType = pointer.Interface()
+	if cast, ok := propertyType.(ConverterCast); ok {
+		return KindConverterCast, cast.target, propertyType
 	}
+
+	propertyType = structToPointer(propertyType)
 
 	if _, ok := propertyType.(TypeInterface); ok {
 		return KindType, reflect.TypeOf(propertyType).Elem(), propertyType

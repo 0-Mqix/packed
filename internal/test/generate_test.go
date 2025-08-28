@@ -138,7 +138,7 @@ func TestArrayOfStructOfBitPackedStructsBothEndian(t *testing.T) {
 
 func TestMatrixOfExampleTypeInterface(t *testing.T) {
 
-	f := F{
+	definition := F{
 		A: [2][2][2]types.ExampleTypeInterface{
 			{
 				{{A: 1}, {A: 2}},
@@ -151,14 +151,14 @@ func TestMatrixOfExampleTypeInterface(t *testing.T) {
 		},
 	}
 
-	bytesF := make([]byte, f.Size())
-	f.ToBytes(bytesF, 0)
+	bytes := make([]byte, definition.Size())
+	definition.ToBytes(bytes, 0)
 
-	var resultF F
-	resultF.FromBytes(bytesF, 0)
+	var result F
+	result.FromBytes(bytes, 0)
 
-	if !reflect.DeepEqual(f, resultF) {
-		t.Errorf("f: expected %v, got %v", f, resultF)
+	if !reflect.DeepEqual(definition, result) {
+		t.Errorf("f: expected %v, got %v", definition, result)
 	}
 }
 
@@ -185,5 +185,28 @@ func TestMatrixOfExampleConverterBitArray(t *testing.T) {
 
 	if !reflect.DeepEqual(g, resultG) {
 		t.Errorf("g: expected %v, got %v", g, resultG)
+	}
+}
+
+func TestConverterCast(t *testing.T) {
+
+	definition := I{
+		A: types.ExampleEnumValueA,
+		B: [2]types.ExampleEnum{types.ExampleEnumValueB, types.ExampleEnumValueC},
+		C: [2]H{
+			{A: types.ExampleEnumValueA},
+			{A: types.ExampleEnumValueB},
+		},
+		D: types.ExampleEnumStringValueA,
+	}
+
+	bytes := make([]byte, definition.Size())
+	definition.ToBytes(bytes, 0)
+
+	var result I
+	result.FromBytes(bytes, 0)
+
+	if !reflect.DeepEqual(definition, result) {
+		t.Errorf("i: expected %v, got %v", definition, result)
 	}
 }

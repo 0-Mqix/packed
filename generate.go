@@ -44,11 +44,14 @@ func (p *PackedStruct) StructDefinition() []byte {
 		case KindConverter:
 
 			if overwrite, ok := property.packed.(OverwriteConverterReciverReflectionInterface); ok {
-				propertyType = overwrite.OverwriteConverterReciverReflection(property.recieverType)
+				propertyType = overwrite.OverwriteConverterReciverReflection(property.recieverType).String()
 
 			} else {
 				propertyType = property.recieverType.String()
 			}
+
+		case KindConverterCast:
+			propertyType = property.packed.(ConverterCast).target.String()
 
 		case KindType:
 			propertyType = property.propertyType.Elem().String()
@@ -92,7 +95,7 @@ func (p *PackedStruct) StructDefinition() []byte {
 	return buffer.Bytes()
 }
 
-func (p *PackedProperty) WriteProperty(buffer *bytes.Buffer, functionName, recieverPrefix string, offset *int) {
+func (p *PackedProperty) WriteProperty(buffer *bytes.Buffer, structure *PackedStruct, functionName, recieverPrefix string, offset *int) {
 	endian := "LittleEndian"
 
 	if !p.littleEndian {
@@ -105,17 +108,23 @@ func (p *PackedProperty) WriteProperty(buffer *bytes.Buffer, functionName, recie
 
 	case KindStruct:
 		for _, child := range p.packed.(PackedStruct).properties {
-			child.WriteProperty(buffer, functionName, reciever, offset)
+			child.WriteProperty(buffer, structure, functionName, reciever, offset)
 		}
 		return
 
 	case KindConverter:
 		fmt.Fprintf(buffer, "%s.%s%s(&%s, bytes, index + %d)\n", getConverterName(p.converter.hash), functionName, endian, reciever, *offset)
 
+	case KindConverterCast:
+		cast := p.packed.(ConverterCast)
+		cast.Write(buffer, structure, reciever, functionName, p.littleEndian, fmt.Sprintf("index + %d", *offset))
+		*offset += cast.size
+		return
+
 	case KindArray:
 		array := p.packed.(PackedArray)
 		fmt.Fprintf(buffer, "o%d := index + %d\n", *offset, *offset)
-		array.Write(buffer, reciever, functionName, p.littleEndian, fmt.Sprintf("o%d", *offset), 0)
+		array.Write(buffer, structure, reciever, functionName, p.littleEndian, fmt.Sprintf("o%d", *offset), 0)
 		*offset += p.size
 		return
 
@@ -150,8 +159,12 @@ func (p *PackedStruct) ConversionDefinition(functionName string) []byte {
 	fmt.Fprintf(buffer, "func (reciever *%s) %s(bytes []byte, index int) {\n", p.name, functionName)
 	offset := 0
 
+	for reciever, index := range p.converterCastRecievers {
+		fmt.Fprintf(buffer, "var r%d %s\n", index, reciever)
+	}
+
 	for _, property := range p.properties {
-		property.WriteProperty(buffer, functionName, "reciever", &offset)
+		property.WriteProperty(buffer, p, functionName, "reciever", &offset)
 	}
 
 	fmt.Fprintf(buffer, "}\n")

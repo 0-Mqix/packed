@@ -59,11 +59,11 @@ type InitializeConverterFieldInterface interface {
 }
 
 type OverwriteConverterReflectionInterface interface {
-	OverwriteConverterReflection(reflection reflect.Type) string
+	OverwriteConverterReflection(reflection reflect.Type) reflect.Type
 }
 
 type OverwriteConverterReciverReflectionInterface interface {
-	OverwriteConverterReciverReflection(reflection reflect.Type) string
+	OverwriteConverterReciverReflection(reflection reflect.Type) reflect.Type
 }
 
 func createConverterHash(converter any) converterHash {
@@ -84,7 +84,7 @@ func createConverterHash(converter any) converterHash {
 	}
 
 	if _, ok := converter.(OverwriteConverterReflectionInterface); ok {
-		result.reflection = converter.(OverwriteConverterReflectionInterface).OverwriteConverterReflection(reflection)
+		result.reflection = converter.(OverwriteConverterReflectionInterface).OverwriteConverterReflection(reflection).String()
 	}
 
 	if reflection.Kind() == reflect.Struct {
@@ -196,6 +196,7 @@ func Generate(outputFile string, packageName string) {
 	})
 
 	if err != nil {
+		os.WriteFile(outputFile, buffer.Bytes(), 0644)
 		panic("failed to generate code")
 	}
 

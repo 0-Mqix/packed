@@ -8,6 +8,14 @@ const (
 	ExampleEnumValueC
 )
 
+type ExampleEnumString string
+
+const (
+	ExampleEnumStringValueA ExampleEnumString = "A"
+	ExampleEnumStringValueB ExampleEnumString = "B"
+	ExampleEnumStringValueC ExampleEnumString = "C"
+)
+
 type ExampleTypeInterface struct {
 	A int
 }
