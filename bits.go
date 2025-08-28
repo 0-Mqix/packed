@@ -22,7 +22,11 @@ func initPackedBitFieldGroup(groupIndex int, fields []packedBitField) packedBitF
 	}
 	size := (totalBits + 7) / 8
 	if size < 1 || size > 8 {
-		panic(fmt.Sprintf("invalid bit group size: %d bytes (%d bits)", size, totalBits))
+		panic(fmt.Sprintf(
+			"invalid bit group size: %d bytes (%d bits)",
+			size,
+			totalBits,
+		))
 	}
 	return packedBitFieldGroup{
 		groupIndex: groupIndex,
@@ -31,11 +35,19 @@ func initPackedBitFieldGroup(groupIndex int, fields []packedBitField) packedBitF
 	}
 }
 
+type bitFieldKind int
+
+const (
+	bitFieldKindInteger bitFieldKind = iota
+	bitFieldKindBoolean
+	bitFieldKindBitsType
+)
+
 type packedBitField struct {
 	bitSize            int
 	reflection         reflect.Type
 	packedProperty     packedProperty
-	bitsType           bool
+	bitFieldKind       bitFieldKind
 	bitsTypeReflection reflect.Type
 }
 
@@ -43,7 +55,7 @@ func (p packedBitField) signed() bool {
 	switch p.reflection.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return true
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+	case reflect.Bool, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		return false
 	default:
 		panic("invalid type for bitfield")
@@ -63,23 +75,58 @@ func Bits[Interger constraints.Integer](bits int, bitsType ...bitsType[Interger]
 		panic("bits cannot be larger than the underlying type size")
 	}
 
-	field := packedBitField{bitSize: bits, reflection: reflect.TypeOf(value)}
+	field := packedBitField{
+		bitSize:      bits,
+		reflection:   reflect.TypeOf(value),
+		bitFieldKind: bitFieldKindInteger,
+	}
 
 	if len(bitsType) != 0 {
-
 		if len(bitsType) != 1 {
 			panic("bits type must be a single type")
 		}
-
 		if bitsType[0] == nil {
 			panic("bits type cannot be nil")
 		}
-
-		field.bitsType = true
+		field.bitFieldKind = bitFieldKindBitsType
 		field.bitsTypeReflection = reflect.TypeOf(bitsType[0])
 	}
 
 	return field
+}
+
+var Bit = packedBitField{
+	bitSize:      1,
+	reflection:   reflect.TypeOf(bool(false)),
+	bitFieldKind: bitFieldKindBoolean,
+}
+
+type fieldOffset struct {
+	field     packedBitField
+	bitOffset int
+}
+
+func (g packedBitFieldGroup) computeOffsets(littleEndian bool) []fieldOffset {
+	result := make([]fieldOffset, 0, len(g.fields))
+
+	if littleEndian {
+		runningOffset := 0
+		for _, field := range g.fields {
+			result = append(result, fieldOffset{field: field, bitOffset: runningOffset})
+			runningOffset += field.bitSize
+		}
+		return result
+	}
+
+	remainingBits := g.size * 8
+
+	for _, field := range g.fields {
+		bitOffset := remainingBits - field.bitSize
+		result = append(result, fieldOffset{field: field, bitOffset: bitOffset})
+		remainingBits -= field.bitSize
+	}
+
+	return result
 }
 
 func (g packedBitFieldGroup) writeToBytes(
@@ -89,87 +136,62 @@ func (g packedBitFieldGroup) writeToBytes(
 	offset string,
 ) {
 	fmt.Fprintf(buffer, "var b%d uint64\n", g.groupIndex)
-	if littleEndian {
-		runningOffset := 0
-		for _, field := range g.fields {
 
-			receiver := receiverVariable + field.packedProperty.name
+	offsets := g.computeOffsets(littleEndian)
+	for _, fieldOffset := range offsets {
+		field := fieldOffset.field
+		bitOffset := fieldOffset.bitOffset
+		receiver := receiverVariable + field.packedProperty.name
 
-			if field.bitsType {
-				receiver += ".Integer()"
-			}
-
-			mask := (uint64(1) << field.bitSize) - 1
-			bitOffset := runningOffset
-			if bitOffset == 0 {
-				fmt.Fprintf(buffer,
-					"b%d |= (uint64(%s) & 0x%X)\n",
-					g.groupIndex,
-					receiver,
-					mask,
-				)
-			} else {
-				fmt.Fprintf(buffer,
-					"b%d |= (uint64(%s) & 0x%X) << %d\n",
-					g.groupIndex,
-					receiver,
-					mask,
-					bitOffset,
-				)
-			}
-			runningOffset += field.bitSize
+		if field.bitFieldKind == bitFieldKindBoolean {
+			fmt.Fprintf(
+				buffer,
+				"b%d |= (uint64(*(*uint8)(unsafe.Pointer(&%s))) & 1) << %d\n",
+				g.groupIndex,
+				receiver,
+				bitOffset,
+			)
+			continue
 		}
-	} else {
-		remainingBits := g.size * 8
-		for _, field := range g.fields {
 
-			receiver := receiverVariable + field.packedProperty.name
+		if field.bitFieldKind == bitFieldKindBitsType {
+			receiver += ".Integer()"
+		}
 
-			if field.bitsType {
-				receiver += ".Integer()"
-			}
-
-			mask := (uint64(1) << field.bitSize) - 1
-			bitOffset := remainingBits - field.bitSize
-			if bitOffset == 0 {
-				fmt.Fprintf(buffer,
-					"b%d |= (uint64(%s) & 0x%X)\n",
-					g.groupIndex,
-					receiver,
-					mask,
-				)
-			} else {
-				fmt.Fprintf(buffer,
-					"b%d |= (uint64(%s) & 0x%X) << %d\n",
-					g.groupIndex,
-					receiver,
-					mask,
-					bitOffset,
-				)
-			}
-			remainingBits -= field.bitSize
+		mask := (uint64(1) << field.bitSize) - 1
+		if bitOffset == 0 {
+			fmt.Fprintf(
+				buffer,
+				"b%d |= (uint64(%s) & 0x%X)\n",
+				g.groupIndex,
+				receiver,
+				mask,
+			)
+		} else {
+			fmt.Fprintf(
+				buffer,
+				"b%d |= (uint64(%s) & 0x%X) << %d\n",
+				g.groupIndex,
+				receiver,
+				mask,
+				bitOffset,
+			)
 		}
 	}
-	if littleEndian {
-		for i := 0; i < g.size; i++ {
-			fmt.Fprintf(buffer,
-				"bytes[%s+%d] = byte(b%d >> %d)\n",
-				offset,
-				i,
-				g.groupIndex,
-				8*i,
-			)
+
+	for i := 0; i < g.size; i++ {
+		idx := i
+		if !littleEndian {
+			idx = g.size - 1 - i
 		}
-	} else {
-		for i := 0; i < g.size; i++ {
-			fmt.Fprintf(buffer,
-				"bytes[%s+%d] = byte(b%d >> %d)\n",
-				offset,
-				g.size-1-i,
-				g.groupIndex,
-				8*i,
-			)
-		}
+		fmt.Fprintf(
+			buffer,
+			"bytes[%s+%d] = byte(b%d >> %d)\n",
+			offset,
+			idx,
+			g.groupIndex,
+			8*i,
+		)
 	}
 }
 
@@ -180,109 +202,75 @@ func (g packedBitFieldGroup) writeFromBytes(
 	offset string,
 ) {
 	fmt.Fprintf(buffer, "var b%d uint64\n", g.groupIndex)
-	if littleEndian {
-		for i := 0; i < g.size; i++ {
-			fmt.Fprintf(buffer,
-				"b%d |= uint64(bytes[%s+%d]) << %d\n",
-				g.groupIndex,
-				offset,
-				i,
-				8*i,
-			)
+
+	for i := 0; i < g.size; i++ {
+		idx := i
+		if !littleEndian {
+			idx = g.size - 1 - i
 		}
-	} else {
-		for i := 0; i < g.size; i++ {
-			fmt.Fprintf(buffer,
-				"b%d |= uint64(bytes[%s+%d]) << %d\n",
-				g.groupIndex,
-				offset,
-				g.size-1-i,
-				8*i,
-			)
-		}
+		fmt.Fprintf(
+			buffer,
+			"b%d |= uint64(bytes[%s+%d]) << %d\n",
+			g.groupIndex,
+			offset,
+			idx,
+			8*i,
+		)
 	}
-	if littleEndian {
-		runningOffset := 0
-		for _, field := range g.fields {
 
-			receiver := receiverVariable + field.packedProperty.name
+	offsets := g.computeOffsets(littleEndian)
 
-			if field.bitsType {
-				fmt.Fprintf(buffer, "%s.Set(", receiver)
-			} else {
-				fmt.Fprintf(buffer, "%s = ", receiver)
-			}
+	for _, fieldOffset := range offsets {
+		field := fieldOffset.field
+		bitOffset := fieldOffset.bitOffset
+		receiver := receiverVariable + field.packedProperty.name
 
-			mask := (uint64(1) << field.bitSize) - 1
-			bitOffset := runningOffset
-			if field.signed() {
-				fmt.Fprintf(buffer,
-					"%s((( (b%d >> %d) & 0x%X ) ^ (1 << %d)) - (1 << %d))",
-					field.reflection.String(),
-					g.groupIndex,
-					bitOffset,
-					mask,
-					field.bitSize-1,
-					field.bitSize-1,
-				)
-			} else {
-				fmt.Fprintf(buffer,
-					"%s(uint64((b%d >> %d) & 0x%X))",
-					field.reflection.String(),
-					g.groupIndex,
-					bitOffset,
-					mask,
-				)
-			}
-			runningOffset += field.bitSize
+		mask := (uint64(1) << field.bitSize) - 1
 
-			if field.bitsType {
-				fmt.Fprintf(buffer, ")\n")
-			} else {
-				fmt.Fprintf(buffer, "\n")
-			}
+		if field.bitFieldKind == bitFieldKindBoolean {
+			fmt.Fprintf(
+				buffer,
+				"%s = ((b%d >> %d) & 0x%X) != 0\n",
+				receiver,
+				g.groupIndex,
+				bitOffset,
+				mask,
+			)
+			continue
 		}
-	} else {
-		remainingBits := g.size * 8
-		for _, field := range g.fields {
 
-			receiver := receiverVariable + field.packedProperty.name
+		if field.bitFieldKind == bitFieldKindBitsType {
+			fmt.Fprintf(buffer, "%s.Set(", receiver)
+		} else {
+			fmt.Fprintf(buffer, "%s = ", receiver)
+		}
 
-			if field.bitsType {
-				fmt.Fprintf(buffer, "%s.Set(", receiver)
-			} else {
-				fmt.Fprintf(buffer, "%s = ", receiver)
-			}
+		if field.signed() {
+			fmt.Fprintf(
+				buffer,
+				"%s((( (b%d >> %d) & 0x%X ) ^ (1 << %d)) - (1 << %d))",
+				field.reflection,
+				g.groupIndex,
+				bitOffset,
+				mask,
+				field.bitSize-1,
+				field.bitSize-1,
+			)
+		} else {
+			fmt.Fprintf(
+				buffer,
+				"%s(uint64((b%d >> %d) & 0x%X))",
+				field.reflection,
+				g.groupIndex,
+				bitOffset,
+				mask,
+			)
+		}
 
-			mask := (uint64(1) << field.bitSize) - 1
-			bitOffset := remainingBits - field.bitSize
-			if field.signed() {
-				fmt.Fprintf(buffer,
-					"%s((( (b%d >> %d) & 0x%X ) ^ (1 << %d)) - (1 << %d))",
-					field.reflection.String(),
-					g.groupIndex,
-					bitOffset,
-					mask,
-					field.bitSize-1,
-					field.bitSize-1,
-				)
-			} else {
-				fmt.Fprintf(buffer,
-					"%s(uint64((b%d >> %d) & 0x%X))",
-					field.reflection.String(),
-					g.groupIndex,
-					bitOffset,
-					mask,
-				)
-			}
-
-			if field.bitsType {
-				fmt.Fprintf(buffer, ")\n")
-			} else {
-				fmt.Fprintf(buffer, "\n")
-			}
-
-			remainingBits -= field.bitSize
+		if field.bitFieldKind == bitFieldKindBitsType {
+			fmt.Fprintf(buffer, ")\n")
+		} else {
+			fmt.Fprintf(buffer, "\n")
 		}
 	}
 }

@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestBoolConverter(t *testing.T) {
-	converter := BoolConverter{}
+func TestBooleanConverter(t *testing.T) {
+	converter := BooleanConverter{}
 	values := []bool{true, false}
 
 	for _, original := range values {

@@ -28,7 +28,8 @@ func main() {
 		Field("C", Bits[uint32](20), Tag("json", "c"), Tag("xml", "c")),
 		Field("D", Bits[int64](30), Tag("json", "d"), Tag("xml", "d")),
 		Field("E", Bits[int8](4), Tag("json", "e"), Tag("xml", "e")),
-		Field("F", Bits[int8](4), Tag("json", "f"), Tag("xml", "f")),
+		Field("F", Bit, Tag("json", "f"), Tag("xml", "f")),
+		Field("G", Bits[int8](3), Tag("json", "g"), Tag("xml", "g")),
 	)
 
 	C := Struct("C", true,
@@ -37,7 +38,8 @@ func main() {
 		Field("C", Bits[uint32](20)),
 		Field("D", Bits[int64](30)),
 		Field("E", Bits[int8](4)),
-		Field("F", Bits[int8](4)),
+		Field("F", Bit),
+		Field("G", Bits[int8](3)),
 	)
 
 	D := Struct("D", true,
@@ -76,6 +78,11 @@ func main() {
 	Struct("K", false,
 		Field("A", Bits[uint8](6)),
 		Field("B", Bits(10, &types.ExampleBitsType{})),
+	)
+
+	Struct("L", true,
+		Field("A", Bits[uint8](7)),
+		Field("B", Bit),
 	)
 
 	workingDirectory, _ := os.Getwd()

@@ -80,7 +80,7 @@ func (p *packedStruct) structDefinition() []byte {
 
 				reflection := field.reflection
 
-				if field.bitsType {
+				if field.bitFieldKind == bitFieldKindBitsType {
 					reflection = field.bitsTypeReflection.Elem()
 				}
 

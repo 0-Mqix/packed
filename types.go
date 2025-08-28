@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	Bool    = BoolConverter{}
+	Boolean = BooleanConverter{}
 	Int8    = Int8Converter{}
 	Int16   = Int16Converter{}
 	Int32   = Int32Converter{}
@@ -20,11 +20,11 @@ var (
 	Float64 = Float64Converter{}
 )
 
-type BoolConverter struct{}
+type BooleanConverter struct{}
 
-func (BoolConverter) Size() int { return 1 }
+func (BooleanConverter) Size() int { return 1 }
 
-func (BoolConverter) ToBytesLittleEndian(value *bool, bytes []byte, index int) {
+func (BooleanConverter) ToBytesLittleEndian(value *bool, bytes []byte, index int) {
 	if *value {
 		bytes[index] = 1
 	} else {
@@ -32,11 +32,11 @@ func (BoolConverter) ToBytesLittleEndian(value *bool, bytes []byte, index int) {
 	}
 }
 
-func (BoolConverter) FromBytesLittleEndian(receiver *bool, bytes []byte, index int) {
+func (BooleanConverter) FromBytesLittleEndian(receiver *bool, bytes []byte, index int) {
 	*receiver = bytes[index] > 0
 }
 
-func (BoolConverter) ToBytesBigEndian(value *bool, bytes []byte, index int) {
+func (BooleanConverter) ToBytesBigEndian(value *bool, bytes []byte, index int) {
 	if *value {
 		bytes[index] = 1
 	} else {
@@ -44,7 +44,7 @@ func (BoolConverter) ToBytesBigEndian(value *bool, bytes []byte, index int) {
 	}
 }
 
-func (BoolConverter) FromBytesBigEndian(receiver *bool, bytes []byte, index int) {
+func (BooleanConverter) FromBytesBigEndian(receiver *bool, bytes []byte, index int) {
 	*receiver = bytes[index] > 0
 }
 
