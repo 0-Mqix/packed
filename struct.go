@@ -5,17 +5,17 @@ import (
 	"reflect"
 )
 
-type PackedStruct struct {
+type packedStruct struct {
 	name                   string
-	properties             []PackedProperty
+	properties             []packedProperty
 	size                   int
 	littleEndian           bool
 	converterCastRecievers map[reflect.Type]int
 }
 
-func (s PackedStruct) Size() int { return s.size }
+func (p packedStruct) Size() int { return p.size }
 
-func (p PackedStruct) SetEndianProperties(littleEndian bool, forceOverride bool) {
+func (p *packedStruct) setEndianProperties(littleEndian bool, forceOverride bool) {
 
 	for i, child := range p.properties {
 
@@ -28,8 +28,8 @@ func (p PackedStruct) SetEndianProperties(littleEndian bool, forceOverride bool)
 			}
 		}
 
-		if packed, ok := child.packed.(PackedStruct); ok {
-			packed.SetEndianProperties(littleEndian, forceOverride)
+		if packed, ok := child.packed.(packedStruct); ok {
+			packed.setEndianProperties(littleEndian, forceOverride)
 			child.packed = packed
 		}
 
@@ -37,21 +37,21 @@ func (p PackedStruct) SetEndianProperties(littleEndian bool, forceOverride bool)
 	}
 }
 
-func (p *PackedStruct) SetBitFieldGroupIndexes(index *int) {
+func (p *packedStruct) setBitFieldGroupIndexes(index *int) {
 
 	for i, child := range p.properties {
 
 		switch child.kind {
 
-		case KindBitFieldGroup:
-			group := child.packed.(PackedBitFieldGroup)
+		case kindBitFieldGroup:
+			group := child.packed.(packedBitFieldGroup)
 			group.groupIndex = *index
 			child.packed = group
 			*index++
 
-		case KindStruct:
-			packed := child.packed.(PackedStruct)
-			packed.SetBitFieldGroupIndexes(index)
+		case kindStruct:
+			packed := child.packed.(packedStruct)
+			packed.setBitFieldGroupIndexes(index)
 			child.packed = packed
 
 		default:
@@ -62,13 +62,13 @@ func (p *PackedStruct) SetBitFieldGroupIndexes(index *int) {
 	}
 }
 
-func (p *PackedStruct) GetConverterCastRecievers(converterCastRecievers map[reflect.Type]int) {
+func (p *packedStruct) getConverterCastRecievers(converterCastRecievers map[reflect.Type]int) {
 	for i, child := range p.properties {
 
 		switch child.kind {
 
-		case KindConverterCast:
-			cast := child.packed.(ConverterCast)
+		case kindConverterCast:
+			cast := child.packed.(converterCast)
 
 			if _, ok := converterCastRecievers[cast.reciever]; !ok {
 				converterCastRecievers[cast.reciever] = len(converterCastRecievers)
@@ -76,23 +76,23 @@ func (p *PackedStruct) GetConverterCastRecievers(converterCastRecievers map[refl
 
 			child.packed = cast
 
-		case KindStruct:
-			packed := child.packed.(PackedStruct)
-			packed.GetConverterCastRecievers(converterCastRecievers)
+		case kindStruct:
+			packed := child.packed.(packedStruct)
+			packed.getConverterCastRecievers(converterCastRecievers)
 			child.packed = packed
 
-		case KindArray:
-			packed := child.packed.(PackedArray)
+		case kindArray:
+			packed := child.packed.(packedArray)
 
 			switch packed.ElementKind {
 
-			case KindStruct:
-				structure := packed.Element.(PackedStruct)
-				structure.GetConverterCastRecievers(converterCastRecievers)
+			case kindStruct:
+				structure := packed.Element.(packedStruct)
+				structure.getConverterCastRecievers(converterCastRecievers)
 				packed.Element = structure
 
-			case KindConverterCast:
-				cast := packed.Element.(ConverterCast)
+			case kindConverterCast:
+				cast := packed.Element.(converterCast)
 
 				if _, ok := converterCastRecievers[cast.reciever]; !ok {
 					converterCastRecievers[cast.reciever] = len(converterCastRecievers)
@@ -111,32 +111,32 @@ func (p *PackedStruct) GetConverterCastRecievers(converterCastRecievers map[refl
 	}
 }
 
-func createBitFieldGroup(fields []PackedBitField, littleEndian bool) PackedProperty {
+func createBitFieldGroup(fields []packedBitField, littleEndian bool) packedProperty {
 
-	group := InitPackedBitFieldGroup(0, fields)
+	group := initPackedBitFieldGroup(0, fields)
 
-	packed := PackedProperty{
+	packed := packedProperty{
 		size:         group.size,
 		packed:       group,
-		kind:         KindBitFieldGroup,
+		kind:         kindBitFieldGroup,
 		littleEndian: littleEndian,
 	}
 
 	return packed
 }
 
-func Struct(name string, littleEndian bool, properties ...PackedProperty) PackedStruct {
+func Struct(name string, littleEndian bool, properties ...packedProperty) packedStruct {
 
 	if _, ok := structs[name]; ok {
 		panic(fmt.Sprintf("struct %s already exists", name))
 	}
 
-	processedProperties := []PackedProperty{}
-	currentBitFields := []PackedBitField{}
+	processedProperties := []packedProperty{}
+	currentBitFields := []packedBitField{}
 	propertyNames := map[string]bool{}
 	size := 0
 
-	addBitFieldGroup := func(fields []PackedBitField, littleEndian bool) {
+	addBitFieldGroup := func(fields []packedBitField, littleEndian bool) {
 		property := createBitFieldGroup(fields, littleEndian)
 		processedProperties = append(processedProperties, property)
 		size += property.size
@@ -150,7 +150,7 @@ func Struct(name string, littleEndian bool, properties ...PackedProperty) Packed
 			propertyNames[property.name] = true
 		}
 
-		if property.kind != KindBitField {
+		if property.kind != kindBitField {
 			if len(currentBitFields) > 0 {
 				addBitFieldGroup(currentBitFields, littleEndian)
 				currentBitFields = nil
@@ -161,7 +161,7 @@ func Struct(name string, littleEndian bool, properties ...PackedProperty) Packed
 			continue
 		}
 
-		bitField := property.packed.(PackedBitField)
+		bitField := property.packed.(packedBitField)
 		bitField.packedProperty = property
 
 		totalBits := 0
@@ -172,7 +172,7 @@ func Struct(name string, littleEndian bool, properties ...PackedProperty) Packed
 
 		if (totalBits+bitField.bitSize+7)/8 > 8 {
 			addBitFieldGroup(currentBitFields, littleEndian)
-			currentBitFields = []PackedBitField{bitField}
+			currentBitFields = []packedBitField{bitField}
 		} else {
 			currentBitFields = append(currentBitFields, bitField)
 		}
@@ -183,7 +183,7 @@ func Struct(name string, littleEndian bool, properties ...PackedProperty) Packed
 		addBitFieldGroup(currentBitFields, littleEndian)
 	}
 
-	packed := PackedStruct{
+	packed := packedStruct{
 		name:                   name,
 		size:                   size,
 		littleEndian:           littleEndian,
@@ -193,9 +193,9 @@ func Struct(name string, littleEndian bool, properties ...PackedProperty) Packed
 
 	bitFieldGroupIndex := 0
 
-	packed.SetEndianProperties(littleEndian, false)
-	packed.SetBitFieldGroupIndexes(&bitFieldGroupIndex)
-	packed.GetConverterCastRecievers(packed.converterCastRecievers)
+	packed.setEndianProperties(littleEndian, false)
+	packed.setBitFieldGroupIndexes(&bitFieldGroupIndex)
+	packed.getConverterCastRecievers(packed.converterCastRecievers)
 
 	structs[name] = packed
 

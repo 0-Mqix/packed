@@ -25,7 +25,7 @@ type converterHash struct {
 }
 
 var (
-	structs                 = map[string]PackedStruct{}
+	structs                 = map[string]packedStruct{}
 	converters              = map[string]converterHash{}
 	imported                = map[string]bool{}
 	converterIdentifiers    = map[string]string{}
@@ -46,12 +46,6 @@ type ConverterInterface[Reciever any] interface {
 	FromBytesLittleEndian(reciever *Reciever, bytes []byte, index int)
 	ToBytesBigEndian(reciever *Reciever, bytes []byte, index int)
 	FromBytesBigEndian(reciever *Reciever, bytes []byte, index int)
-}
-
-type StructInterface interface {
-	Size() int
-	ToBytes(bytes []byte, index int)
-	FromBytes(bytes []byte, index int)
 }
 
 type InitializeConverterFieldInterface interface {
@@ -123,6 +117,12 @@ func getConverterName(hash string) string {
 	return name
 }
 
+func Load(structures ...packedStruct) {
+	for _, structure := range structures {
+		structs[structure.name] = structure
+	}
+}
+
 func Generate(outputFile string, packageName string) {
 
 	buffer := &bytes.Buffer{}
@@ -179,13 +179,13 @@ func Generate(outputFile string, packageName string) {
 	fmt.Fprintf(buffer, ")\n")
 
 	for _, packed := range structs {
-		buffer.Write(packed.StructDefinition())
+		buffer.Write(packed.structDefinition())
 		fmt.Fprintf(buffer, "\n")
-		buffer.Write(packed.SizeDefinition())
+		buffer.Write(packed.sizeDefinition())
 		fmt.Fprintf(buffer, "\n")
-		buffer.Write(packed.ConversionDefinition("ToBytes"))
+		buffer.Write(packed.conversionDefinition("ToBytes"))
 		fmt.Fprintf(buffer, "\n")
-		buffer.Write(packed.ConversionDefinition("FromBytes"))
+		buffer.Write(packed.conversionDefinition("FromBytes"))
 		fmt.Fprintf(buffer, "\n")
 	}
 

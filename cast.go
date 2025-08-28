@@ -6,18 +6,18 @@ import (
 	"reflect"
 )
 
-type ConverterCast struct {
+type converterCast struct {
 	converter converterHash
 	reciever  reflect.Type
 	target    reflect.Type
 	size      int
 }
 
-func (c ConverterCast) Size() int {
+func (c converterCast) Size() int {
 	return c.size
 }
 
-func Cast[T any](converter any) ConverterCast {
+func Cast[T any](converter any) converterCast {
 
 	var value T
 
@@ -47,7 +47,7 @@ func Cast[T any](converter any) ConverterCast {
 
 	size := converter.(interface{ Size() int }).Size()
 
-	return ConverterCast{
+	return converterCast{
 		converter: hash,
 		reciever:  reciever,
 		target:    target,
@@ -55,7 +55,7 @@ func Cast[T any](converter any) ConverterCast {
 	}
 }
 
-func (c ConverterCast) Write(buffer *bytes.Buffer, structure *PackedStruct, recieverVariable string, functionName string, littleEndian bool, offsetVariable string) {
+func (c converterCast) Write(buffer *bytes.Buffer, structure *packedStruct, recieverVariable string, functionName string, littleEndian bool, offsetVariable string) {
 
 	endian := "LittleEndian"
 

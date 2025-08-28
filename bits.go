@@ -9,13 +9,13 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-type PackedBitFieldGroup struct {
+type packedBitFieldGroup struct {
 	groupIndex int
-	fields     []PackedBitField
+	fields     []packedBitField
 	size       int
 }
 
-func InitPackedBitFieldGroup(groupIndex int, fields []PackedBitField) PackedBitFieldGroup {
+func initPackedBitFieldGroup(groupIndex int, fields []packedBitField) packedBitFieldGroup {
 	totalBits := 0
 	for _, field := range fields {
 		totalBits += field.bitSize
@@ -24,20 +24,20 @@ func InitPackedBitFieldGroup(groupIndex int, fields []PackedBitField) PackedBitF
 	if size < 1 || size > 8 {
 		panic(fmt.Sprintf("invalid bit group size: %d bytes (%d bits)", size, totalBits))
 	}
-	return PackedBitFieldGroup{
+	return packedBitFieldGroup{
 		groupIndex: groupIndex,
 		fields:     fields,
 		size:       size,
 	}
 }
 
-type PackedBitField struct {
+type packedBitField struct {
 	bitSize        int
 	reflection     reflect.Type
-	packedProperty PackedProperty
+	packedProperty packedProperty
 }
 
-func (p PackedBitField) Signed() bool {
+func (p packedBitField) signed() bool {
 	switch p.reflection.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return true
@@ -48,16 +48,16 @@ func (p PackedBitField) Signed() bool {
 	}
 }
 
-func Bits[T constraints.Integer](bits int) PackedBitField {
+func Bits[T constraints.Integer](bits int) packedBitField {
 	var value T
 	size := unsafe.Sizeof(value) * 8
 	if bits > int(size) {
 		panic("bits cannot be larger than the underlying type size")
 	}
-	return PackedBitField{bitSize: bits, reflection: reflect.TypeOf(value)}
+	return packedBitField{bitSize: bits, reflection: reflect.TypeOf(value)}
 }
 
-func (g PackedBitFieldGroup) WriteToBytes(
+func (g packedBitFieldGroup) writeToBytes(
 	buffer *bytes.Buffer,
 	receiverVariable string,
 	littleEndian bool,
@@ -136,7 +136,7 @@ func (g PackedBitFieldGroup) WriteToBytes(
 	}
 }
 
-func (g PackedBitFieldGroup) WriteFromBytes(
+func (g packedBitFieldGroup) writeFromBytes(
 	buffer *bytes.Buffer,
 	receiverVariable string,
 	littleEndian bool,
@@ -170,7 +170,7 @@ func (g PackedBitFieldGroup) WriteFromBytes(
 			receiver := receiverVariable + field.packedProperty.name
 			mask := (uint64(1) << field.bitSize) - 1
 			bitOffset := runningOffset
-			if field.Signed() {
+			if field.signed() {
 				fmt.Fprintf(buffer,
 					"%s = %s((( (b%d >> %d) & 0x%X ) ^ (1 << %d)) - (1 << %d))\n",
 					receiver,
@@ -199,7 +199,7 @@ func (g PackedBitFieldGroup) WriteFromBytes(
 			receiver := receiverVariable + field.packedProperty.name
 			mask := (uint64(1) << field.bitSize) - 1
 			bitOffset := remainingBits - field.bitSize
-			if field.Signed() {
+			if field.signed() {
 				fmt.Fprintf(buffer,
 					"%s = %s((( (b%d >> %d) & 0x%X ) ^ (1 << %d)) - (1 << %d))\n",
 					receiver,

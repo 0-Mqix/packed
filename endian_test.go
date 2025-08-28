@@ -35,7 +35,7 @@ func TestEndianSettings(t *testing.T) {
 		"B": false,
 	}
 
-	output := getEndianProperties(a.ConversionDefinition("ToBytes"))
+	output := getEndianProperties(a.conversionDefinition("ToBytes"))
 
 	if !maps.Equal(intput, output) {
 		t.Fatal("endian properties of a not equal")
@@ -56,7 +56,7 @@ func TestEndianSettings(t *testing.T) {
 		"C.B": false,
 	}
 
-	output = getEndianProperties(b.ConversionDefinition("ToBytes"))
+	output = getEndianProperties(b.conversionDefinition("ToBytes"))
 
 	if !maps.Equal(intput, output) {
 		t.Fatal("endian properties of b not equal")
@@ -89,7 +89,7 @@ func TestEndianSettings(t *testing.T) {
 		"E.B":   false,
 	}
 
-	output = getEndianProperties(c.ConversionDefinition("ToBytes"))
+	output = getEndianProperties(c.conversionDefinition("ToBytes"))
 
 	if !maps.Equal(intput, output) {
 		t.Fatal("endian properties of c not equal")

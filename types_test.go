@@ -270,8 +270,8 @@ func TestFloat64Converter(t *testing.T) {
 }
 
 func TestStringConverter(t *testing.T) {
-	converter := String(10)
-	original := "test"
+	converter := String(1)
+	original := "A"
 
 	bytes := make([]byte, converter.Size())
 

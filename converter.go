@@ -30,7 +30,7 @@ func ValidateSize(converter any) bool {
 	return true
 }
 
-func ValidateConverter(methodName string, converter any) (reflect.Type, bool) {
+func validateConverter(methodName string, converter any) (reflect.Type, bool) {
 	if converter == nil {
 		return nil, false
 	}
@@ -75,7 +75,7 @@ func implementsConverterInterface(converter any) (reflect.Type, bool) {
 	recievers := []reflect.Type{}
 
 	for _, methodName := range []string{"ToBytesLittleEndian", "FromBytesLittleEndian", "ToBytesBigEndian", "FromBytesBigEndian"} {
-		reciever, valid := ValidateConverter(methodName, converter)
+		reciever, valid := validateConverter(methodName, converter)
 		if !valid {
 			return nil, false
 		}
