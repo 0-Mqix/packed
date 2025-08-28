@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	types "github.com/0-mqix/packed/internal/test/types"
+	types "github.com/0-Mqix/packed/internal/test/types"
 )
 
 func TestStructTags(t *testing.T) {

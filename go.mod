@@ -1,4 +1,4 @@
-module github.com/0-mqix/packed
+module github.com/0-Mqix/packed
 
 go 1.24.2
 

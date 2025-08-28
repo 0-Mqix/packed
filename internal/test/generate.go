@@ -6,8 +6,8 @@ import (
 	"os"
 	"path"
 
-	. "github.com/0-mqix/packed"
-	types "github.com/0-mqix/packed/internal/test/types"
+	. "github.com/0-Mqix/packed"
+	types "github.com/0-Mqix/packed/internal/test/types"
 )
 
 func main() {
