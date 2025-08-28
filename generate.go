@@ -21,10 +21,17 @@ func (p *PackedStruct) StructDefinition() []byte {
 	fmt.Fprintf(buffer, "type %s struct {\n", p.name)
 
 	for _, property := range p.properties {
+
 		tags := []string{}
 
-		for key, value := range property.tags {
-			tags = append(tags, fmt.Sprintf("`%s:\"%s\"`", key, value))
+		for _, tag := range property.tags {
+			tags = append(tags, fmt.Sprintf("%s:\"%s\"", tag.key, tag.value))
+		}
+
+		var tagString string
+
+		if len(tags) > 0 {
+			tagString = "`" + strings.Join(tags, " ") + "`"
 		}
 
 		var propertyType string
@@ -58,11 +65,17 @@ func (p *PackedStruct) StructDefinition() []byte {
 
 				tags := []string{}
 
-				for key, value := range property.tags {
-					tags = append(tags, fmt.Sprintf("`%s:\"%s\"`", key, value))
+				for _, tag := range property.tags {
+					tags = append(tags, fmt.Sprintf("%s:\"%s\"", tag.key, tag.value))
 				}
 
-				fmt.Fprintf(buffer, "%s %s %s\n", property.name, field.reflection.String(), strings.Join(tags, " "))
+				var tagString string
+
+				if len(tags) > 0 {
+					tagString = "`" + strings.Join(tags, " ") + "`"
+				}
+
+				fmt.Fprintf(buffer, "%s %s %s\n", property.name, field.reflection.String(), tagString)
 			}
 
 			continue
@@ -71,7 +84,7 @@ func (p *PackedStruct) StructDefinition() []byte {
 			panic("invalid property kind")
 		}
 
-		fmt.Fprintf(buffer, "%s %s %s\n", property.name, propertyType, strings.Join(tags, " "))
+		fmt.Fprintf(buffer, "%s %s %s\n", property.name, propertyType, tagString)
 	}
 
 	fmt.Fprintf(buffer, "}\n")
@@ -113,9 +126,9 @@ func (p *PackedProperty) WriteProperty(buffer *bytes.Buffer, functionName, recie
 
 		switch functionName {
 		case "ToBytes":
-			group.WriteToBytes(buffer, reciever, endian, offsetString)
+			group.WriteToBytes(buffer, reciever, p.littleEndian, offsetString)
 		case "FromBytes":
-			group.WriteFromBytes(buffer, reciever, endian, offsetString)
+			group.WriteFromBytes(buffer, reciever, p.littleEndian, offsetString)
 		default:
 			panic("invalid function name")
 		}

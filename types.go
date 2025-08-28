@@ -326,8 +326,8 @@ func (Float64Converter) FromBytesBigEndian(receiver *float64, bytes []byte, inde
 	*receiver = math.Float64frombits(v)
 }
 
-func String(length int) *StringConverter {
-	return &StringConverter{Length: length}
+func String(length int) StringConverter {
+	return StringConverter{Length: length}
 }
 
 type StringConverter struct {
@@ -340,20 +340,20 @@ func (s *StringConverter) InitializeConverterFields() map[string]string {
 	}
 }
 
-func (s StringConverter) Size() int { return s.Length }
+func (s *StringConverter) Size() int { return s.Length }
 
-func (s StringConverter) ToBytesLittleEndian(value *string, bytes []byte, index int) {
+func (s *StringConverter) ToBytesLittleEndian(value *string, bytes []byte, index int) {
 	copy(bytes[index:index+s.Length], []byte(*value))
 }
 
-func (s StringConverter) FromBytesLittleEndian(receiver *string, bytes []byte, index int) {
+func (s *StringConverter) FromBytesLittleEndian(receiver *string, bytes []byte, index int) {
 	*receiver = strings.TrimRight(string(bytes[index:index+s.Length]), "\x00")
 }
 
-func (s StringConverter) ToBytesBigEndian(value *string, bytes []byte, index int) {
+func (s *StringConverter) ToBytesBigEndian(value *string, bytes []byte, index int) {
 	copy(bytes[index:index+s.Length], []byte(*value))
 }
 
-func (s StringConverter) FromBytesBigEndian(receiver *string, bytes []byte, index int) {
+func (s *StringConverter) FromBytesBigEndian(receiver *string, bytes []byte, index int) {
 	*receiver = strings.TrimRight(string(bytes[index:index+s.Length]), "\x00")
 }

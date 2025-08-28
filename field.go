@@ -18,13 +18,18 @@ const (
 	KindBitFieldGroup
 )
 
+type StructTag struct {
+	key   string
+	value string
+}
+
 type PackedProperty struct {
 	name           string
 	size           int
 	packed         any
 	recieverType   reflect.Type
 	propertyType   reflect.Type
-	tags           map[string]string
+	tags           []StructTag
 	kind           Kind
 	littleEndian   bool
 	endianOverride bool
@@ -35,7 +40,7 @@ type FieldOption func(*PackedProperty)
 
 func Tag(key, value string) FieldOption {
 	return func(definition *PackedProperty) {
-		definition.tags[key] = value
+		definition.tags = append(definition.tags, StructTag{key: key, value: value})
 	}
 }
 
@@ -51,40 +56,12 @@ func (p *PackedStruct) replacePropertiesWithClone() {
 	}
 }
 
-func Type(propertyType any) FieldOption {
-	return func(definition *PackedProperty) {
-
-		if reflect.TypeOf(definition.packed).String() != "*interface {}" {
-			panic("type option can only be used if the field generic argument is any")
-		}
-
-	}
-}
-
-func (p PackedStruct) SetEndianProperties(littleEndian bool, forceOverride bool) {
-
-	for i, child := range p.properties {
-
-		if !child.endianOverride || forceOverride {
-
-			child.littleEndian = littleEndian
-
-			if forceOverride {
-				child.endianOverride = true
-			}
-		}
-
-		if packed, ok := child.packed.(PackedStruct); ok {
-			packed.SetEndianProperties(littleEndian, forceOverride)
-			child.packed = packed
-		}
-
-		p.properties[i] = child
-	}
-}
-
 func LittleEndian(value bool) FieldOption {
 	return func(definition *PackedProperty) {
+
+		if definition.kind == KindBitField {
+			panic("endianness cannot be set for bit fields")
+		}
 
 		definition.littleEndian = value
 		definition.endianOverride = true
@@ -96,22 +73,30 @@ func LittleEndian(value bool) FieldOption {
 	}
 }
 
-func validatePropertyType(propertyType any) (Kind, reflect.Type) {
-
-	if _, ok := propertyType.(TypeInterface); ok {
-		return KindType, reflect.TypeOf(propertyType)
-	}
+func validatePropertyType(propertyType any) (Kind, reflect.Type, any) {
 
 	if _, ok := propertyType.(PackedStruct); ok {
-		return KindStruct, nil
+		return KindStruct, nil, propertyType
 	}
 
 	if _, ok := propertyType.(PackedArray); ok {
-		return KindArray, nil
+		return KindArray, nil, propertyType
 	}
 
 	if _, ok := propertyType.(PackedBitField); ok {
-		return KindBitField, nil
+		return KindBitField, nil, propertyType
+	}
+
+	value := reflect.ValueOf(propertyType)
+
+	if value.Kind() == reflect.Struct {
+		pointer := reflect.New(value.Type())
+		pointer.Elem().Set(value)
+		propertyType = pointer.Interface()
+	}
+
+	if _, ok := propertyType.(TypeInterface); ok {
+		return KindType, reflect.TypeOf(propertyType).Elem(), propertyType
 	}
 
 	if reciever, ok := implementsConverterInterface(propertyType); ok {
@@ -120,31 +105,31 @@ func validatePropertyType(propertyType any) (Kind, reflect.Type) {
 			reciever = reflect.TypeOf(overwrite.OverwriteConverterReciverReflection(reflect.TypeOf(propertyType)))
 		}
 
-		return KindConverter, reciever
+		return KindConverter, reciever, propertyType
 	}
 
-	return KindInvalid, nil
+	return KindInvalid, nil, propertyType
 }
 
 func Field(name string, propertyType any, options ...FieldOption) PackedProperty {
 
-	property := PackedProperty{name: name, tags: make(map[string]string)}
+	property := PackedProperty{name: name, tags: []StructTag{}}
 
-	if packed, ok := propertyType.(PackedStruct); ok {
+	if packed, ok := any(propertyType).(PackedStruct); ok {
 		packed.replacePropertiesWithClone()
 		property.packed = packed
 	} else {
 		property.packed = propertyType
 	}
 
-	for _, option := range options {
-		option(&property)
-	}
-
-	property.kind, property.recieverType = validatePropertyType(property.packed)
+	property.kind, property.recieverType, property.packed = validatePropertyType(property.packed)
 
 	if property.kind == KindInvalid {
 		panic(fmt.Sprintf("invalid property type: %T", property.packed))
+	}
+
+	for _, option := range options {
+		option(&property)
 	}
 
 	property.propertyType = reflect.TypeOf(property.packed)

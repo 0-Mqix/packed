@@ -19,7 +19,7 @@ func (a PackedArray) Size() int {
 
 func getArrayRecieverType(propertyType any) string {
 
-	kind, recieverType := validatePropertyType(propertyType)
+	kind, recieverType, propertyType := validatePropertyType(propertyType)
 
 	if kind == KindArray {
 		array := propertyType.(PackedArray)
@@ -35,10 +35,18 @@ func getArrayRecieverType(propertyType any) string {
 
 func Array(length int, elementType any) PackedArray {
 
-	kind, _ := validatePropertyType(elementType)
+	kind, _, elementType := validatePropertyType(elementType)
 
 	if kind == KindBitField {
 		panic("bit fields as direct array elements are not supported")
+	}
+
+	if kind == KindConverter {
+		hash := createConverterHash(elementType)
+
+		if _, exists := converters[hash.hash]; !exists {
+			converters[hash.hash] = hash
+		}
 	}
 
 	recieverType := fmt.Sprintf("[%d]%s", length, getArrayRecieverType(elementType))
@@ -86,9 +94,9 @@ func (p *PackedProperty) WriteArrayElement(buffer *bytes.Buffer, functionName, r
 
 		switch functionName {
 		case "ToBytes":
-			group.WriteToBytes(buffer, reciever, endian, offsetVariable)
+			group.WriteToBytes(buffer, reciever, p.littleEndian, offsetVariable)
 		case "FromBytes":
-			group.WriteFromBytes(buffer, reciever, endian, offsetVariable)
+			group.WriteFromBytes(buffer, reciever, p.littleEndian, offsetVariable)
 		}
 
 		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, group.size)

@@ -27,7 +27,7 @@ type converterHash struct {
 var (
 	structs                 = map[string]PackedStruct{}
 	converters              = map[string]converterHash{}
-	imported                = map[string]bool{"github.com/0-mqix/packed": true}
+	imported                = map[string]bool{}
 	converterIdentifiers    = map[string]string{}
 	converterLastIdentifier = 0
 )
@@ -196,9 +196,7 @@ func Generate(outputFile string, packageName string) {
 	})
 
 	if err != nil {
-		os.WriteFile("error.go", buffer.Bytes(), 0644)
-		fmt.Println(err)
-		return
+		panic("failed to generate code")
 	}
 
 	os.WriteFile(outputFile, result, 0644)
