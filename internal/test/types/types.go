@@ -85,3 +85,23 @@ func (o *ExampleBitsType) Integer() uint16 {
 
 	return integer
 }
+
+type ExampleBitsTypeConverter struct{}
+
+func (o *ExampleBitsTypeConverter) Set(reciever *[10]bool, integer uint16) {
+	for i := range 10 {
+		reciever[i] = (integer & (1 << i)) != 0
+	}
+}
+
+func (o *ExampleBitsTypeConverter) Integer(reciever *[10]bool) uint16 {
+	var integer uint16
+
+	for i := range 10 {
+		if reciever[i] {
+			integer |= 1 << i
+		}
+	}
+
+	return integer
+}

@@ -74,15 +74,16 @@ func LittleEndian(value bool) fieldOption {
 	}
 }
 
-func structToPointer(structure any) any {
+func toPointer(structure any) any {
 	value := reflect.ValueOf(structure)
 
-	if value.Kind() != reflect.Struct {
+	if value.Kind() == reflect.Ptr {
 		return structure
 	}
 
 	pointer := reflect.New(value.Type())
 	pointer.Elem().Set(value)
+
 	return pointer.Interface()
 }
 
@@ -104,7 +105,7 @@ func validatePropertyType(propertyType any) (kind, reflect.Type, any) {
 		return kindConverterCast, cast.target, propertyType
 	}
 
-	propertyType = structToPointer(propertyType)
+	propertyType = toPointer(propertyType)
 
 	if _, ok := propertyType.(TypeInterface); ok {
 		return kindType, reflect.TypeOf(propertyType).Elem(), propertyType

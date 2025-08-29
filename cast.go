@@ -23,7 +23,7 @@ func Cast[T any](converter any) converterCast {
 
 	target := reflect.TypeOf(value)
 
-	converter = structToPointer(converter)
+	converter = toPointer(converter)
 
 	reciever, ok := implementsConverterInterface(converter)
 

@@ -41,14 +41,16 @@ const (
 	bitFieldKindInteger bitFieldKind = iota
 	bitFieldKindBoolean
 	bitFieldKindBitsType
+	bitFieldKindBitsConverter
 )
 
 type packedBitField struct {
-	bitSize            int
-	reflection         reflect.Type
-	packedProperty     packedProperty
-	bitFieldKind       bitFieldKind
-	bitsTypeReflection reflect.Type
+	bitSize              int
+	reflection           reflect.Type
+	packedProperty       packedProperty
+	bitFieldKind         bitFieldKind
+	bitsTargetReflection reflect.Type
+	converter            *converterHash
 }
 
 func (p packedBitField) signed() bool {
@@ -62,12 +64,17 @@ func (p packedBitField) signed() bool {
 	}
 }
 
-type bitsType[Integer constraints.Integer] interface {
+type BitsTypeInterface[Integer constraints.Integer] interface {
 	Set(Integer)
 	Integer() Integer
 }
 
-func Bits[Interger constraints.Integer](bits int, bitsType ...bitsType[Interger]) packedBitField {
+type BitsConverterInterface[Integer constraints.Integer, Reciever any] interface {
+	Set(*Reciever, Integer)
+	Integer(*Reciever) Integer
+}
+
+func Bits[Interger constraints.Integer](bits int, bitsTarget ...any) packedBitField {
 	var value Interger
 
 	size := unsafe.Sizeof(value) * 8
@@ -75,22 +82,42 @@ func Bits[Interger constraints.Integer](bits int, bitsType ...bitsType[Interger]
 		panic("bits cannot be larger than the underlying type size")
 	}
 
+	reflection := reflect.TypeOf(value)
+
 	field := packedBitField{
 		bitSize:      bits,
-		reflection:   reflect.TypeOf(value),
+		reflection:   reflection,
 		bitFieldKind: bitFieldKindInteger,
 	}
 
-	if len(bitsType) != 0 {
-		if len(bitsType) != 1 {
-			panic("bits type must be a single type")
-		}
-		if bitsType[0] == nil {
-			panic("bits type cannot be nil")
-		}
-		field.bitFieldKind = bitFieldKindBitsType
-		field.bitsTypeReflection = reflect.TypeOf(bitsType[0])
+	if len(bitsTarget) == 0 || bitsTarget == nil {
+		return field
 	}
+
+	target := toPointer(bitsTarget[0])
+
+	if _, ok := target.(BitsTypeInterface[Interger]); ok {
+		field.bitFieldKind = bitFieldKindBitsType
+		field.bitsTargetReflection = reflect.TypeOf(target)
+		return field
+	}
+
+	reciever, ok := implementsBitsConverterInterface(target, reflection)
+
+	if !ok {
+		panic("invalid type for bitfield")
+	}
+
+	field.bitFieldKind = bitFieldKindBitsConverter
+	field.bitsTargetReflection = reciever
+
+	hash := createConverterHash(target)
+
+	if _, exists := converters[hash.hash]; !exists {
+		converters[hash.hash] = hash
+	}
+
+	field.converter = &hash
 
 	return field
 }
@@ -154,8 +181,13 @@ func (g packedBitFieldGroup) writeToBytes(
 			continue
 		}
 
-		if field.bitFieldKind == bitFieldKindBitsType {
+		switch field.bitFieldKind {
+
+		case bitFieldKindBitsType:
 			receiver += ".Integer()"
+
+		case bitFieldKindBitsConverter:
+			receiver = fmt.Sprintf("%s.Integer(&%s)", getConverterName(field.converter.hash), receiver)
 		}
 
 		mask := (uint64(1) << field.bitSize) - 1
@@ -239,9 +271,15 @@ func (g packedBitFieldGroup) writeFromBytes(
 			continue
 		}
 
-		if field.bitFieldKind == bitFieldKindBitsType {
+		switch field.bitFieldKind {
+
+		case bitFieldKindBitsType:
 			fmt.Fprintf(buffer, "%s.Set(", receiver)
-		} else {
+
+		case bitFieldKindBitsConverter:
+			fmt.Fprintf(buffer, "%s.Set(&%s, ", getConverterName(field.converter.hash), receiver)
+
+		default:
 			fmt.Fprintf(buffer, "%s = ", receiver)
 		}
 
@@ -267,9 +305,12 @@ func (g packedBitFieldGroup) writeFromBytes(
 			)
 		}
 
-		if field.bitFieldKind == bitFieldKindBitsType {
+		switch field.bitFieldKind {
+
+		case bitFieldKindBitsType, bitFieldKindBitsConverter:
 			fmt.Fprintf(buffer, ")\n")
-		} else {
+
+		default:
 			fmt.Fprintf(buffer, "\n")
 		}
 	}

@@ -246,3 +246,22 @@ func TestBitsType(t *testing.T) {
 		t.Errorf("k: expected %v, got %v", definitionK, resultK)
 	}
 }
+
+func TestBitsConverter(t *testing.T) {
+
+	definition := L{
+		A: 4,
+		B: [10]bool{true, false, false, true},
+	}
+
+	bytes := make([]byte, definition.Size())
+	definition.ToBytes(bytes, 0)
+
+	var result L
+
+	result.FromBytes(bytes, 0)
+
+	if !reflect.DeepEqual(definition, result) {
+		t.Errorf("j: expected %v, got %v", definition, result)
+	}
+}

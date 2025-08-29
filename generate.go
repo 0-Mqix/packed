@@ -3,6 +3,7 @@ package packed
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -78,10 +79,15 @@ func (p *packedStruct) structDefinition() []byte {
 					tagString = "`" + strings.Join(tags, " ") + "`"
 				}
 
-				reflection := field.reflection
+				var reflection reflect.Type
 
-				if field.bitFieldKind == bitFieldKindBitsType {
-					reflection = field.bitsTypeReflection.Elem()
+				switch field.bitFieldKind {
+
+				case bitFieldKindBitsType, bitFieldKindBitsConverter:
+					reflection = field.bitsTargetReflection.Elem()
+
+				default:
+					reflection = field.reflection
 				}
 
 				fmt.Fprintf(buffer, "%s %s %s\n", property.name, reflection, tagString)

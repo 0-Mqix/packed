@@ -72,17 +72,22 @@ func main() {
 
 	Struct("J", true,
 		Field("A", Bits[uint8](6)),
-		Field("B", Bits(10, &types.ExampleBitsType{})),
+		Field("B", Bits[uint16](10, types.ExampleBitsType{})),
 	)
 
-	Struct("K", false,
+	K := Struct("K", false,
 		Field("A", Bits[uint8](6)),
-		Field("B", Bits(10, &types.ExampleBitsType{})),
+		Field("B", Bits[uint16](10, types.ExampleBitsType{})),
 	)
 
-	Struct("L", true,
-		Field("A", Bits[uint8](7)),
-		Field("B", Bit),
+	L := Struct("L", true,
+		Field("A", Bits[uint8](4)),
+		Field("B", Bits[uint16](10, types.ExampleBitsTypeConverter{})),
+	)
+
+	Struct("M", true,
+		Field("A", Array(2, L)),
+		Field("B", Array(2, K)),
 	)
 
 	workingDirectory, _ := os.Getwd()
