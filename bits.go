@@ -35,6 +35,13 @@ func initPackedBitFieldGroup(groupIndex int, fields []packedBitField) packedBitF
 	}
 }
 
+func EndBitGroup() packedProperty {
+	return packedProperty{
+		size: 0,
+		kind: KindEndBitField,
+	}
+}
+
 type bitFieldKind int
 
 const (

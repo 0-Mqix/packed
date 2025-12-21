@@ -135,6 +135,7 @@ func Struct(name string, littleEndian bool, properties ...packedProperty) packed
 	currentBitFields := []packedBitField{}
 	propertyNames := map[string]bool{}
 	size := 0
+	totalBits := 0
 
 	addBitFieldGroup := func(fields []packedBitField, littleEndian bool) {
 		property := createBitFieldGroup(fields, littleEndian)
@@ -143,6 +144,15 @@ func Struct(name string, littleEndian bool, properties ...packedProperty) packed
 	}
 
 	for _, property := range properties {
+
+		if property.kind == KindEndBitField {
+			if len(currentBitFields) > 0 {
+				addBitFieldGroup(currentBitFields, littleEndian)
+				currentBitFields = nil
+				totalBits = 0
+			}
+			continue
+		}
 
 		if _, ok := propertyNames[property.name]; ok {
 			panic(fmt.Sprintf("property %s already exists", property.name))
@@ -154,6 +164,7 @@ func Struct(name string, littleEndian bool, properties ...packedProperty) packed
 			if len(currentBitFields) > 0 {
 				addBitFieldGroup(currentBitFields, littleEndian)
 				currentBitFields = nil
+				totalBits = 0
 			}
 
 			processedProperties = append(processedProperties, property)
@@ -164,19 +175,14 @@ func Struct(name string, littleEndian bool, properties ...packedProperty) packed
 		bitField := property.packed.(packedBitField)
 		bitField.packedProperty = property
 
-		totalBits := 0
-
-		for _, existingField := range currentBitFields {
-			totalBits += existingField.bitSize
-		}
-
-		if (totalBits+bitField.bitSize+7)/8 > 8 {
+		if totalBits+bitField.bitSize > 64 {
 			addBitFieldGroup(currentBitFields, littleEndian)
 			currentBitFields = []packedBitField{bitField}
+			totalBits = bitField.bitSize
 		} else {
 			currentBitFields = append(currentBitFields, bitField)
+			totalBits += bitField.bitSize
 		}
-
 	}
 
 	if len(currentBitFields) > 0 {

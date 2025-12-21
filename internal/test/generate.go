@@ -7,7 +7,7 @@ import (
 	"path"
 
 	. "github.com/0-Mqix/packed"
-	types "github.com/0-Mqix/packed/internal/test/types"
+	"github.com/0-Mqix/packed/internal/test/types"
 )
 
 func main() {
@@ -88,6 +88,11 @@ func main() {
 	Struct("M", true,
 		Field("A", Array(2, L)),
 		Field("B", Array(2, K)),
+	)
+
+	Struct("N", false,
+		Field("A", Bits[uint8](4)),
+		Field("B", Bits[int8](3)),
 	)
 
 	workingDirectory, _ := os.Getwd()

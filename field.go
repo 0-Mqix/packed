@@ -17,6 +17,7 @@ const (
 	kindArray
 	kindBitField
 	kindBitFieldGroup
+	KindEndBitField
 )
 
 type structTag struct {

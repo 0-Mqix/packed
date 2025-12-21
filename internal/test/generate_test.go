@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	types "github.com/0-Mqix/packed/internal/test/types"
+	"github.com/0-Mqix/packed/internal/test/types"
 )
 
 func TestStructTags(t *testing.T) {
@@ -263,5 +263,28 @@ func TestBitsConverter(t *testing.T) {
 
 	if !reflect.DeepEqual(definition, result) {
 		t.Errorf("j: expected %v, got %v", definition, result)
+	}
+}
+
+func TestBitOverflowAndSignedWrap(t *testing.T) {
+
+	m := N{
+		A: 31,
+		B: -6,
+	}
+
+	bytes := make([]byte, m.Size())
+	m.ToBytes(bytes, 0)
+
+	var result N
+	result.FromBytes(bytes, 0)
+
+	expected := N{
+		A: 15,
+		B: 2,
+	}
+
+	if !reflect.DeepEqual(expected, result) {
+		t.Errorf("m: expected %v, got %v", expected, result)
 	}
 }
