@@ -7,6 +7,32 @@ import (
 	"github.com/0-Mqix/packed/internal/test/types"
 )
 
+func TestGenerateHookGetters(t *testing.T) {
+	// Struct A has: uint8, uint16, uint32, int64, int8, int8, ExampleTypeInterface
+	a := A{A: 42, B: 1000, C: 100000, D: -5, E: 3, F: -1}
+	if a.GetA() != 42 {
+		t.Errorf("A.GetA() = %d, want 42", a.GetA())
+	}
+	if a.GetB() != 1000 {
+		t.Errorf("A.GetB() = %d, want 1000", a.GetB())
+	}
+	if a.GetD() != -5 {
+		t.Errorf("A.GetD() = %d, want -5", a.GetD())
+	}
+
+	// Struct B (bit fields): uint8, uint16, uint32, int64, int8, bool, int8
+	b := B{A: 15, B: 1023, C: 1048575, D: -100050, E: 7, F: true, G: -3}
+	if b.GetA() != 15 {
+		t.Errorf("B.GetA() = %d, want 15", b.GetA())
+	}
+	if b.GetF() != true {
+		t.Errorf("B.GetF() = %v, want true", b.GetF())
+	}
+	if b.GetG() != -3 {
+		t.Errorf("B.GetG() = %d, want -3", b.GetG())
+	}
+}
+
 func TestStructTags(t *testing.T) {
 
 	aType := reflect.TypeOf(A{})

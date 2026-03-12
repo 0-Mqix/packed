@@ -123,7 +123,58 @@ func Load(structures ...packedStruct) {
 	}
 }
 
-func Generate(outputFile string, packageName string) {
+type Property struct {
+	Name string
+	Type reflect.Type
+}
+
+type GenerateHook func(buffer *bytes.Buffer, structName string, properties []Property)
+
+func (p *packedStruct) collectProperties() []Property {
+	var result []Property
+
+	for _, property := range p.properties {
+		switch property.kind {
+
+		case kindBitFieldGroup:
+			group := property.packed.(packedBitFieldGroup)
+			for _, field := range group.fields {
+				var t reflect.Type
+				switch field.bitFieldKind {
+				case bitFieldKindBitsType, bitFieldKindBitsConverter:
+					t = field.bitsTargetReflection.Elem()
+				default:
+					t = field.reflection
+				}
+				result = append(result, Property{Name: field.packedProperty.name, Type: t})
+			}
+
+		case kindStruct:
+			result = append(result, Property{Name: property.name, Type: reflect.TypeFor[*packedStruct]()})
+
+		case kindConverter:
+			if overwrite, ok := property.packed.(OverwriteConverterReciverReflectionInterface); ok {
+				result = append(result, Property{Name: property.name, Type: overwrite.OverwriteConverterReciverReflection(property.recieverType)})
+			} else {
+				result = append(result, Property{Name: property.name, Type: property.recieverType})
+			}
+
+		case kindConverterCast:
+			cast := property.packed.(converterCast)
+			result = append(result, Property{Name: property.name, Type: cast.target})
+
+		case kindType:
+			result = append(result, Property{Name: property.name, Type: property.propertyType.Elem()})
+
+		case kindArray:
+			continue
+		}
+	}
+
+	return result
+}
+
+func Generate(outputFile string, packageName string, hooks ...GenerateHook) {
 
 	buffer := &bytes.Buffer{}
 
@@ -187,6 +238,13 @@ func Generate(outputFile string, packageName string) {
 		fmt.Fprintf(buffer, "\n")
 		buffer.Write(packed.conversionDefinition("FromBytes"))
 		fmt.Fprintf(buffer, "\n")
+
+		if len(hooks) > 0 {
+			properties := packed.collectProperties()
+			for _, hook := range hooks {
+				hook(buffer, packed.name, properties)
+			}
+		}
 	}
 
 	result, err := imports.Process("", buffer.Bytes(), &imports.Options{

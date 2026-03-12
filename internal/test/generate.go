@@ -3,8 +3,11 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 	"path"
+	"reflect"
 
 	. "github.com/0-Mqix/packed"
 	"github.com/0-Mqix/packed/internal/test/types"
@@ -99,5 +102,15 @@ func main() {
 
 	generated := path.Join(workingDirectory, "/output.go")
 
-	Generate(generated, "packed")
+	Generate(generated, "packed", func(buffer *bytes.Buffer, name string, properties []Property) {
+		for _, p := range properties {
+			switch p.Type.Kind() {
+			case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+				reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				fmt.Fprintf(buffer, "func (r *%s) Get%s() int { return int(r.%s) }\n", name, p.Name, p.Name)
+			case reflect.Bool:
+				fmt.Fprintf(buffer, "func (r *%s) Get%s() bool { return r.%s }\n", name, p.Name, p.Name)
+			}
+		}
+	})
 }
