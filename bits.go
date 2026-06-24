@@ -209,6 +209,45 @@ func wordByteBase(offsetBase string, offsetConst, word int, advance bool) string
 	return fmt.Sprintf("%s + %d", offsetBase, offsetConst+8*word)
 }
 
+// writeWordStore spills the low byteCount bytes of word into bytes at base in the
+// given byte order. The Go compiler folds a run of consecutive byte loads into a
+// single wide load but does not do the same for byte stores, so the store side is
+// emitted as binary.*Endian.PutUintNN over the widest power-of-two chunks (one
+// MOVQ/MOVL/MOVW each) while the load side in writeFromBytes stays the byte loop
+// the compiler already combines.
+func writeWordStore(buffer *bytes.Buffer, base, word string, byteCount int, littleEndian bool) {
+	order := "binary.LittleEndian"
+	if !littleEndian {
+		order = "binary.BigEndian"
+	}
+
+	for sourceByte := 0; sourceByte < byteCount; {
+		chunk := 1
+		for chunk*2 <= byteCount-sourceByte {
+			chunk *= 2
+		}
+
+		value := word
+		if sourceByte != 0 {
+			value = fmt.Sprintf("%s >> %d", word, 8*sourceByte)
+		}
+
+		position := sourceByte
+		if !littleEndian {
+			position = byteCount - sourceByte - chunk
+		}
+
+		if chunk == 1 {
+			fmt.Fprintf(buffer, "bytes[%s+%d] = byte(%s)\n", base, position, value)
+		} else {
+			bits := chunk * 8
+			fmt.Fprintf(buffer, "%s.PutUint%d(bytes[%s+%d:], uint%d(%s))\n", order, bits, base, position, bits, value)
+		}
+
+		sourceByte += chunk
+	}
+}
+
 func (field packedBitField) toBytesReceiver(receiverVariable string) string {
 	receiver := receiverVariable + field.packedProperty.name
 
@@ -285,13 +324,7 @@ func (g packedBitFieldGroup) writeToBytes(
 
 		byteCount := wordBytes(g.size, word)
 		base := wordByteBase(offsetBase, offsetConst, word, advance)
-		for byteIndex := 0; byteIndex < byteCount; byteIndex++ {
-			localByte := byteIndex
-			if !littleEndian {
-				localByte = byteCount - 1 - byteIndex
-			}
-			fmt.Fprintf(buffer, "bytes[%s+%d] = byte(b%d >> %d)\n", base, localByte, wordVariable, 8*byteIndex)
-		}
+		writeWordStore(buffer, base, fmt.Sprintf("b%d", wordVariable), byteCount, littleEndian)
 
 		if advance {
 			fmt.Fprintf(buffer, "%s += %d\n", offsetBase, byteCount)
