@@ -143,13 +143,11 @@ func (p *packedProperty) writeProperty(buffer *bytes.Buffer, structure *packedSt
 	case kindBitFieldGroup:
 		group := p.packed.(packedBitFieldGroup)
 
-		offsetString := fmt.Sprintf("index + %d", *offset)
-
 		switch functionName {
 		case "ToBytes":
-			group.writeToBytes(buffer, reciever, p.littleEndian, offsetString)
+			group.writeToBytes(buffer, reciever, p.littleEndian, "index", *offset, false)
 		case "FromBytes":
-			group.writeFromBytes(buffer, reciever, p.littleEndian, offsetString)
+			group.writeFromBytes(buffer, reciever, p.littleEndian, "index", *offset, false)
 		default:
 			panic("invalid function name")
 		}
@@ -171,7 +169,11 @@ func (p *packedStruct) conversionDefinition(functionName string) []byte {
 	fmt.Fprintf(buffer, "func (reciever *%s) %s(bytes []byte, index int) {\n", p.name, functionName)
 	offset := 0
 
+	recieverByIndex := make([]reflect.Type, len(p.converterCastRecievers))
 	for reciever, index := range p.converterCastRecievers {
+		recieverByIndex[index] = reciever
+	}
+	for index, reciever := range recieverByIndex {
 		fmt.Fprintf(buffer, "var r%d %s\n", index, reciever)
 	}
 

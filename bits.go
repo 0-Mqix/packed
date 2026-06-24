@@ -21,7 +21,7 @@ func initPackedBitFieldGroup(groupIndex int, fields []packedBitField) packedBitF
 		totalBits += field.bitSize
 	}
 	size := (totalBits + 7) / 8
-	if size < 1 || size > 8 {
+	if size < 1 {
 		panic(fmt.Sprintf(
 			"invalid bit group size: %d bytes (%d bits)",
 			size,
@@ -32,13 +32,6 @@ func initPackedBitFieldGroup(groupIndex int, fields []packedBitField) packedBitF
 		groupIndex: groupIndex,
 		fields:     fields,
 		size:       size,
-	}
-}
-
-func EndBitGroup() packedProperty {
-	return packedProperty{
-		size: 0,
-		kind: KindEndBitField,
 	}
 }
 
@@ -135,102 +128,174 @@ var Bit = packedBitField{
 	bitFieldKind: bitFieldKindBoolean,
 }
 
-type fieldOffset struct {
-	field     packedBitField
-	bitOffset int
+func bitMask(bits int) uint64 { return (uint64(1) << uint(bits)) - 1 }
+
+func wordCount(size int) int { return (size + 7) / 8 }
+
+func wordBytes(size, word int) int {
+	if remaining := size - 8*word; remaining < 8 {
+		return remaining
+	}
+	return 8
 }
 
-func (g packedBitFieldGroup) computeOffsets(littleEndian bool) []fieldOffset {
-	result := make([]fieldOffset, 0, len(g.fields))
+type bitDeposit struct {
+	word             int
+	sourceShift      int
+	bitCount         int
+	destinationShift int
+}
 
-	if littleEndian {
-		runningOffset := 0
-		for _, field := range g.fields {
-			result = append(result, fieldOffset{field: field, bitOffset: runningOffset})
-			runningOffset += field.bitSize
+type bitPlacement struct {
+	field    packedBitField
+	index    int
+	straddle bool
+	deposits []bitDeposit
+}
+
+// placements assigns each field to the uint64 word(s) backing it. The run is
+// ceil(size/8) words; word w holds output bytes [8w, 8w+8). Little-endian packs
+// from the least-significant bit, big-endian from the most-significant (C
+// __packed__ bit order); a field crossing a word boundary becomes two deposits.
+func (g packedBitFieldGroup) placements(littleEndian bool) []bitPlacement {
+	result := make([]bitPlacement, 0, len(g.fields))
+
+	bitOffset := 0
+	for index, field := range g.fields {
+		bitSize := field.bitSize
+		firstWord := bitOffset / 64
+		bitInWord := bitOffset - 64*firstWord
+
+		placement := bitPlacement{field: field, index: index}
+
+		if (bitOffset+bitSize-1)/64 == firstWord {
+			var destinationShift int
+			if littleEndian {
+				destinationShift = bitInWord
+			} else {
+				destinationShift = wordBytes(g.size, firstWord)*8 - bitInWord - bitSize
+			}
+			placement.deposits = []bitDeposit{{word: firstWord, bitCount: bitSize, destinationShift: destinationShift}}
+		} else {
+			placement.straddle = true
+			firstBits := 64*(firstWord+1) - bitOffset
+			secondBits := bitSize - firstBits
+
+			if littleEndian {
+				placement.deposits = []bitDeposit{
+					{word: firstWord, bitCount: firstBits, destinationShift: bitInWord},
+					{word: firstWord + 1, sourceShift: firstBits, bitCount: secondBits},
+				}
+			} else {
+				upperWordBytes := wordBytes(g.size, firstWord+1)
+				placement.deposits = []bitDeposit{
+					{word: firstWord, sourceShift: secondBits, bitCount: firstBits},
+					{word: firstWord + 1, bitCount: secondBits, destinationShift: upperWordBytes*8 - secondBits},
+				}
+			}
 		}
-		return result
-	}
 
-	remainingBits := g.size * 8
-
-	for _, field := range g.fields {
-		bitOffset := remainingBits - field.bitSize
-		result = append(result, fieldOffset{field: field, bitOffset: bitOffset})
-		remainingBits -= field.bitSize
+		result = append(result, placement)
+		bitOffset += bitSize
 	}
 
 	return result
+}
+
+func wordByteBase(offsetBase string, offsetConst, word int, advance bool) string {
+	if advance {
+		return offsetBase
+	}
+	return fmt.Sprintf("%s + %d", offsetBase, offsetConst+8*word)
+}
+
+func (field packedBitField) toBytesReceiver(receiverVariable string) string {
+	receiver := receiverVariable + field.packedProperty.name
+
+	switch field.bitFieldKind {
+	case bitFieldKindBitsType:
+		return receiver + ".Integer()"
+	case bitFieldKindBitsConverter:
+		return fmt.Sprintf("%s.Integer(&%s)", getConverterName(field.converter.hash), receiver)
+	}
+
+	return receiver
 }
 
 func (g packedBitFieldGroup) writeToBytes(
 	buffer *bytes.Buffer,
 	receiverVariable string,
 	littleEndian bool,
-	offset string,
+	offsetBase string,
+	offsetConst int,
+	advance bool,
 ) {
-	fmt.Fprintf(buffer, "var b%d uint64\n", g.groupIndex)
+	placements := g.placements(littleEndian)
 
-	offsets := g.computeOffsets(littleEndian)
-	for _, fieldOffset := range offsets {
-		field := fieldOffset.field
-		bitOffset := fieldOffset.bitOffset
-		receiver := receiverVariable + field.packedProperty.name
+	for word := 0; word < wordCount(g.size); word++ {
+		wordVariable := g.groupIndex + word
+		fmt.Fprintf(buffer, "var b%d uint64\n", wordVariable)
 
-		if field.bitFieldKind == bitFieldKindBoolean {
-			fmt.Fprintf(
-				buffer,
-				"b%d |= (uint64(*(*uint8)(unsafe.Pointer(&%s))) & 1) << %d\n",
-				g.groupIndex,
-				receiver,
-				bitOffset,
-			)
-			continue
+		for _, placement := range placements {
+			field := placement.field
+
+			for depositIndex, deposit := range placement.deposits {
+				if deposit.word != word {
+					continue
+				}
+
+				if !placement.straddle {
+					if field.bitFieldKind == bitFieldKindBoolean {
+						fmt.Fprintf(
+							buffer,
+							"b%d |= (uint64(*(*uint8)(unsafe.Pointer(&%s))) & 1) << %d\n",
+							wordVariable,
+							receiverVariable+field.packedProperty.name,
+							deposit.destinationShift,
+						)
+						continue
+					}
+
+					receiver := field.toBytesReceiver(receiverVariable)
+					mask := bitMask(deposit.bitCount)
+					if deposit.destinationShift == 0 {
+						fmt.Fprintf(buffer, "b%d |= (uint64(%s) & 0x%X)\n", wordVariable, receiver, mask)
+					} else {
+						fmt.Fprintf(buffer, "b%d |= (uint64(%s) & 0x%X) << %d\n", wordVariable, receiver, mask, deposit.destinationShift)
+					}
+					continue
+				}
+
+				temporary := fmt.Sprintf("s%d_%d", g.groupIndex, placement.index)
+				if depositIndex == 0 {
+					fmt.Fprintf(buffer, "%s := uint64(%s) & 0x%X\n", temporary, field.toBytesReceiver(receiverVariable), bitMask(field.bitSize))
+				}
+
+				source := temporary
+				if deposit.sourceShift != 0 {
+					source = fmt.Sprintf("(%s >> %d)", temporary, deposit.sourceShift)
+				}
+				expression := fmt.Sprintf("(%s & 0x%X)", source, bitMask(deposit.bitCount))
+				if deposit.destinationShift != 0 {
+					expression = fmt.Sprintf("%s << %d", expression, deposit.destinationShift)
+				}
+				fmt.Fprintf(buffer, "b%d |= %s\n", g.groupIndex+deposit.word, expression)
+			}
 		}
 
-		switch field.bitFieldKind {
-
-		case bitFieldKindBitsType:
-			receiver += ".Integer()"
-
-		case bitFieldKindBitsConverter:
-			receiver = fmt.Sprintf("%s.Integer(&%s)", getConverterName(field.converter.hash), receiver)
+		byteCount := wordBytes(g.size, word)
+		base := wordByteBase(offsetBase, offsetConst, word, advance)
+		for byteIndex := 0; byteIndex < byteCount; byteIndex++ {
+			localByte := byteIndex
+			if !littleEndian {
+				localByte = byteCount - 1 - byteIndex
+			}
+			fmt.Fprintf(buffer, "bytes[%s+%d] = byte(b%d >> %d)\n", base, localByte, wordVariable, 8*byteIndex)
 		}
 
-		mask := (uint64(1) << field.bitSize) - 1
-		if bitOffset == 0 {
-			fmt.Fprintf(
-				buffer,
-				"b%d |= (uint64(%s) & 0x%X)\n",
-				g.groupIndex,
-				receiver,
-				mask,
-			)
-		} else {
-			fmt.Fprintf(
-				buffer,
-				"b%d |= (uint64(%s) & 0x%X) << %d\n",
-				g.groupIndex,
-				receiver,
-				mask,
-				bitOffset,
-			)
+		if advance {
+			fmt.Fprintf(buffer, "%s += %d\n", offsetBase, byteCount)
 		}
-	}
-
-	for i := 0; i < g.size; i++ {
-		idx := i
-		if !littleEndian {
-			idx = g.size - 1 - i
-		}
-		fmt.Fprintf(
-			buffer,
-			"bytes[%s+%d] = byte(b%d >> %d)\n",
-			offset,
-			idx,
-			g.groupIndex,
-			8*i,
-		)
 	}
 }
 
@@ -238,87 +303,91 @@ func (g packedBitFieldGroup) writeFromBytes(
 	buffer *bytes.Buffer,
 	receiverVariable string,
 	littleEndian bool,
-	offset string,
+	offsetBase string,
+	offsetConst int,
+	advance bool,
 ) {
-	fmt.Fprintf(buffer, "var b%d uint64\n", g.groupIndex)
+	placements := g.placements(littleEndian)
 
-	for i := 0; i < g.size; i++ {
-		idx := i
-		if !littleEndian {
-			idx = g.size - 1 - i
+	for word := 0; word < wordCount(g.size); word++ {
+		wordVariable := g.groupIndex + word
+		fmt.Fprintf(buffer, "var b%d uint64\n", wordVariable)
+
+		byteCount := wordBytes(g.size, word)
+		base := wordByteBase(offsetBase, offsetConst, word, advance)
+		for byteIndex := 0; byteIndex < byteCount; byteIndex++ {
+			localByte := byteIndex
+			if !littleEndian {
+				localByte = byteCount - 1 - byteIndex
+			}
+			fmt.Fprintf(buffer, "b%d |= uint64(bytes[%s+%d]) << %d\n", wordVariable, base, localByte, 8*byteIndex)
 		}
-		fmt.Fprintf(
-			buffer,
-			"b%d |= uint64(bytes[%s+%d]) << %d\n",
-			g.groupIndex,
-			offset,
-			idx,
-			8*i,
-		)
+
+		// extract every field whose last (highest-addressed) word is this one,
+		// so that a straddling field is reconstructed only after both words exist.
+		for _, placement := range placements {
+			if placement.deposits[len(placement.deposits)-1].word != word {
+				continue
+			}
+
+			field := placement.field
+			receiver := receiverVariable + field.packedProperty.name
+			rawValue := g.rawValue(placement)
+
+			if placement.straddle {
+				temporary := fmt.Sprintf("s%d_%d", g.groupIndex, placement.index)
+				fmt.Fprintf(buffer, "%s := %s\n", temporary, rawValue)
+				rawValue = temporary
+			}
+
+			emitFieldExtract(buffer, field, receiver, rawValue)
+		}
+
+		if advance {
+			fmt.Fprintf(buffer, "%s += %d\n", offsetBase, byteCount)
+		}
+	}
+}
+
+// rawValue rebuilds the unsigned field value from its word deposits. For a
+// single-word field this is the historical "(bX >> shift) & mask" expression.
+func (g packedBitFieldGroup) rawValue(placement bitPlacement) string {
+	term := func(deposit bitDeposit) string {
+		text := fmt.Sprintf("(b%d >> %d) & 0x%X", g.groupIndex+deposit.word, deposit.destinationShift, bitMask(deposit.bitCount))
+		if deposit.sourceShift != 0 {
+			text = fmt.Sprintf("(%s) << %d", text, deposit.sourceShift)
+		}
+		return text
 	}
 
-	offsets := g.computeOffsets(littleEndian)
+	if len(placement.deposits) == 1 {
+		return term(placement.deposits[0])
+	}
 
-	for _, fieldOffset := range offsets {
-		field := fieldOffset.field
-		bitOffset := fieldOffset.bitOffset
-		receiver := receiverVariable + field.packedProperty.name
+	return fmt.Sprintf("(%s) | (%s)", term(placement.deposits[0]), term(placement.deposits[1]))
+}
 
-		mask := (uint64(1) << field.bitSize) - 1
+func convertRawValue(field packedBitField, rawValue string) string {
+	if field.bitFieldKind == bitFieldKindBoolean {
+		return fmt.Sprintf("(%s) != 0", rawValue)
+	}
 
-		if field.bitFieldKind == bitFieldKindBoolean {
-			fmt.Fprintf(
-				buffer,
-				"%s = ((b%d >> %d) & 0x%X) != 0\n",
-				receiver,
-				g.groupIndex,
-				bitOffset,
-				mask,
-			)
-			continue
-		}
+	if field.signed() {
+		return fmt.Sprintf("%s((( %s ) ^ (1 << %d)) - (1 << %d))", field.reflection, rawValue, field.bitSize-1, field.bitSize-1)
+	}
 
-		switch field.bitFieldKind {
+	return fmt.Sprintf("%s(uint64(%s))", field.reflection, rawValue)
+}
 
-		case bitFieldKindBitsType:
-			fmt.Fprintf(buffer, "%s.Set(", receiver)
+func emitFieldExtract(buffer *bytes.Buffer, field packedBitField, receiver, rawValue string) {
+	value := convertRawValue(field, rawValue)
 
-		case bitFieldKindBitsConverter:
-			fmt.Fprintf(buffer, "%s.Set(&%s, ", getConverterName(field.converter.hash), receiver)
-
-		default:
-			fmt.Fprintf(buffer, "%s = ", receiver)
-		}
-
-		if field.signed() {
-			fmt.Fprintf(
-				buffer,
-				"%s((( (b%d >> %d) & 0x%X ) ^ (1 << %d)) - (1 << %d))",
-				field.reflection,
-				g.groupIndex,
-				bitOffset,
-				mask,
-				field.bitSize-1,
-				field.bitSize-1,
-			)
-		} else {
-			fmt.Fprintf(
-				buffer,
-				"%s(uint64((b%d >> %d) & 0x%X))",
-				field.reflection,
-				g.groupIndex,
-				bitOffset,
-				mask,
-			)
-		}
-
-		switch field.bitFieldKind {
-
-		case bitFieldKindBitsType, bitFieldKindBitsConverter:
-			fmt.Fprintf(buffer, ")\n")
-
-		default:
-			fmt.Fprintf(buffer, "\n")
-		}
+	switch field.bitFieldKind {
+	case bitFieldKindBitsType:
+		fmt.Fprintf(buffer, "%s.Set(%s)\n", receiver, value)
+	case bitFieldKindBitsConverter:
+		fmt.Fprintf(buffer, "%s.Set(&%s, %s)\n", getConverterName(field.converter.hash), receiver, value)
+	default:
+		fmt.Fprintf(buffer, "%s = %s\n", receiver, value)
 	}
 }

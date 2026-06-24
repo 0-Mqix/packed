@@ -93,8 +93,10 @@ func TestStructTags(t *testing.T) {
 
 func TestBitPackedStructsBothEndian(t *testing.T) {
 
-	// bytesFromCompilerStructB := []byte{255, 255, 255, 255, 255, 254, 121, 46, 120}
-	// bytesFromCompilerStructC := []byte{255, 255, 255, 255, 187, 228, 249, 255, 135}
+	// Ground truth from a real C __attribute__((__packed__)) struct: B compiled
+	// big-endian (aarch64_be), C compiled little-endian (x86-64).
+	bytesFromCompilerStructB := []byte{255, 255, 255, 255, 255, 254, 121, 46, 125}
+	bytesFromCompilerStructC := []byte{255, 255, 255, 255, 187, 228, 249, 255, 167}
 
 	b := B{
 		A: 15,
@@ -122,13 +124,13 @@ func TestBitPackedStructsBothEndian(t *testing.T) {
 	b.ToBytes(bytesB, 0)
 	c.ToBytes(bytesC, 0)
 
-	// if !reflect.DeepEqual(bytesB, bytesFromCompilerStructB) {
-	// 	t.Errorf("c bytes b: expected %v, got %v", bytesFromCompilerStructB, bytesB)
-	// }
+	if !reflect.DeepEqual(bytesB, bytesFromCompilerStructB) {
+		t.Errorf("c bytes b: expected %v, got %v", bytesFromCompilerStructB, bytesB)
+	}
 
-	// if !reflect.DeepEqual(bytesC, bytesFromCompilerStructC) {
-	// 	t.Errorf("c bytes c: expected %v, got %v", bytesFromCompilerStructC, bytesC)
-	// }
+	if !reflect.DeepEqual(bytesC, bytesFromCompilerStructC) {
+		t.Errorf("c bytes c: expected %v, got %v", bytesFromCompilerStructC, bytesC)
+	}
 
 	var resultB B
 	resultB.FromBytes(bytesB, 0)

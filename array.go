@@ -99,12 +99,11 @@ func (p *packedProperty) writeArrayElement(buffer *bytes.Buffer, structure *pack
 
 		switch functionName {
 		case "ToBytes":
-			group.writeToBytes(buffer, reciever, p.littleEndian, offsetVariable)
+			group.writeToBytes(buffer, reciever, p.littleEndian, offsetVariable, 0, true)
 		case "FromBytes":
-			group.writeFromBytes(buffer, reciever, p.littleEndian, offsetVariable)
+			group.writeFromBytes(buffer, reciever, p.littleEndian, offsetVariable, 0, true)
 		}
-
-		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, group.size)
+		// the offset variable is advanced per word inside write{To,From}Bytes
 
 	default:
 		panic("invalid property kind")

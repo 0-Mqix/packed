@@ -98,6 +98,64 @@ func main() {
 		Field("B", Bits[int8](3)),
 	)
 
+	// O and P: a contiguous run longer than 64 bits where a signed field (C)
+	// straddles the 64-bit word boundary, little- and big-endian.
+	Struct("O", true,
+		Field("A", Bits[uint32](20)),
+		Field("B", Bits[uint64](35)),
+		Field("C", Bits[int16](13)),
+		Field("D", Bits[uint8](7)),
+		Field("E", Bit),
+	)
+
+	Struct("P", false,
+		Field("A", Bits[uint32](20)),
+		Field("B", Bits[uint64](35)),
+		Field("C", Bits[int16](13)),
+		Field("D", Bits[uint8](7)),
+		Field("E", Bit),
+	)
+
+	// Q and R: a run longer than 128 bits spanning three words, with fields that
+	// straddle both the 64-bit and 128-bit boundaries.
+	Struct("Q", true,
+		Field("A", Bits[uint64](50)),
+		Field("B", Bits[uint64](50)),
+		Field("C", Bits[uint64](40)),
+		Field("D", Bits[int8](5)),
+	)
+
+	Struct("R", false,
+		Field("A", Bits[uint64](50)),
+		Field("B", Bits[uint64](50)),
+		Field("C", Bits[uint64](40)),
+		Field("D", Bits[int8](5)),
+	)
+
+	// S and T: the reproducer - 21 contiguous bit-fields totalling 77 bits, which
+	// is 10 bytes under C __packed__ (the old splitter produced 11 and misaligned).
+	Struct("S", true,
+		Field("F0", Bits[uint32](5)), Field("F1", Bits[uint32](5)), Field("F2", Bits[uint32](5)),
+		Field("F3", Bits[uint32](5)), Field("F4", Bits[uint32](5)), Field("F5", Bits[uint32](5)),
+		Field("F6", Bits[uint32](5)), Field("F7", Bits[uint32](5)), Field("F8", Bits[uint32](5)),
+		Field("F9", Bits[uint32](5)), Field("F10", Bits[uint32](5)), Field("F11", Bits[uint32](5)),
+		Field("F12", Bits[uint32](7)),
+		Field("F13", Bits[uint32](1)), Field("F14", Bits[uint32](1)), Field("F15", Bits[uint32](1)),
+		Field("F16", Bits[uint32](1)), Field("F17", Bits[uint32](2)), Field("F18", Bits[uint32](1)),
+		Field("F19", Bits[uint32](1)), Field("F20", Bits[uint32](2)),
+	)
+
+	Struct("T", false,
+		Field("F0", Bits[uint32](5)), Field("F1", Bits[uint32](5)), Field("F2", Bits[uint32](5)),
+		Field("F3", Bits[uint32](5)), Field("F4", Bits[uint32](5)), Field("F5", Bits[uint32](5)),
+		Field("F6", Bits[uint32](5)), Field("F7", Bits[uint32](5)), Field("F8", Bits[uint32](5)),
+		Field("F9", Bits[uint32](5)), Field("F10", Bits[uint32](5)), Field("F11", Bits[uint32](5)),
+		Field("F12", Bits[uint32](7)),
+		Field("F13", Bits[uint32](1)), Field("F14", Bits[uint32](1)), Field("F15", Bits[uint32](1)),
+		Field("F16", Bits[uint32](1)), Field("F17", Bits[uint32](2)), Field("F18", Bits[uint32](1)),
+		Field("F19", Bits[uint32](1)), Field("F20", Bits[uint32](2)),
+	)
+
 	workingDirectory, _ := os.Getwd()
 
 	generated := path.Join(workingDirectory, "/output.go")

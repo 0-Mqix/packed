@@ -6,9 +6,19 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 
 	"golang.org/x/tools/imports"
 )
+
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
 
 type converterHashField struct {
 	reflect reflect.StructField
@@ -188,7 +198,8 @@ func Generate(outputFile string, packageName string, hooks ...GenerateHook) {
 
 	fmt.Fprintf(buffer, "var (\n")
 
-	for _, converter := range converters {
+	for _, hash := range sortedKeys(converters) {
+		converter := converters[hash]
 
 		var initialize InitializeConverterFieldInterface
 
@@ -198,7 +209,8 @@ func Generate(outputFile string, packageName string, hooks ...GenerateHook) {
 
 		fmt.Fprintf(buffer, "// %s", converter.reflection)
 
-		for name, field := range converter.fields {
+		for _, name := range sortedKeys(converter.fields) {
+			field := converter.fields[name]
 
 			if !field.hash {
 				continue
@@ -214,8 +226,8 @@ func Generate(outputFile string, packageName string, hooks ...GenerateHook) {
 
 			fields := initialize.InitializeConverterFields()
 
-			for name, value := range fields {
-				fmt.Fprintf(buffer, " %s: %v,", name, value)
+			for _, name := range sortedKeys(fields) {
+				fmt.Fprintf(buffer, " %s: %v,", name, fields[name])
 			}
 
 			fmt.Fprintf(buffer, "}")
@@ -229,7 +241,8 @@ func Generate(outputFile string, packageName string, hooks ...GenerateHook) {
 
 	fmt.Fprintf(buffer, ")\n")
 
-	for _, packed := range structs {
+	for _, name := range sortedKeys(structs) {
+		packed := structs[name]
 		buffer.Write(packed.structDefinition())
 		fmt.Fprintf(buffer, "\n")
 		buffer.Write(packed.sizeDefinition())
