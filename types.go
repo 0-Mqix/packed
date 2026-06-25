@@ -1,6 +1,7 @@
 package packed
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 	"strings"
@@ -73,23 +74,19 @@ type Int16Converter struct{}
 func (Int16Converter) Size() int { return 2 }
 
 func (Int16Converter) ToBytesLittleEndian(value *int16, bytes []byte, index int) {
-	v := uint16(*value)
-	bytes[index] = byte(v)
-	bytes[index+1] = byte(v >> 8)
+	binary.LittleEndian.PutUint16(bytes[index:], uint16(*value))
 }
 
 func (Int16Converter) FromBytesLittleEndian(receiver *int16, bytes []byte, index int) {
-	*receiver = int16(uint16(bytes[index]) | uint16(bytes[index+1])<<8)
+	*receiver = int16(binary.LittleEndian.Uint16(bytes[index:]))
 }
 
 func (Int16Converter) ToBytesBigEndian(value *int16, bytes []byte, index int) {
-	v := uint16(*value)
-	bytes[index] = byte(v >> 8)
-	bytes[index+1] = byte(v)
+	binary.BigEndian.PutUint16(bytes[index:], uint16(*value))
 }
 
 func (Int16Converter) FromBytesBigEndian(receiver *int16, bytes []byte, index int) {
-	*receiver = int16(uint16(bytes[index])<<8 | uint16(bytes[index+1]))
+	*receiver = int16(binary.BigEndian.Uint16(bytes[index:]))
 }
 
 type Int32Converter struct{}
@@ -97,27 +94,19 @@ type Int32Converter struct{}
 func (Int32Converter) Size() int { return 4 }
 
 func (Int32Converter) ToBytesLittleEndian(value *int32, bytes []byte, index int) {
-	v := uint32(*value)
-	bytes[index] = byte(v)
-	bytes[index+1] = byte(v >> 8)
-	bytes[index+2] = byte(v >> 16)
-	bytes[index+3] = byte(v >> 24)
+	binary.LittleEndian.PutUint32(bytes[index:], uint32(*value))
 }
 
 func (Int32Converter) FromBytesLittleEndian(receiver *int32, bytes []byte, index int) {
-	*receiver = int32(uint32(bytes[index]) | uint32(bytes[index+1])<<8 | uint32(bytes[index+2])<<16 | uint32(bytes[index+3])<<24)
+	*receiver = int32(binary.LittleEndian.Uint32(bytes[index:]))
 }
 
 func (Int32Converter) ToBytesBigEndian(value *int32, bytes []byte, index int) {
-	v := uint32(*value)
-	bytes[index] = byte(v >> 24)
-	bytes[index+1] = byte(v >> 16)
-	bytes[index+2] = byte(v >> 8)
-	bytes[index+3] = byte(v)
+	binary.BigEndian.PutUint32(bytes[index:], uint32(*value))
 }
 
 func (Int32Converter) FromBytesBigEndian(receiver *int32, bytes []byte, index int) {
-	*receiver = int32(uint32(bytes[index])<<24 | uint32(bytes[index+1])<<16 | uint32(bytes[index+2])<<8 | uint32(bytes[index+3]))
+	*receiver = int32(binary.BigEndian.Uint32(bytes[index:]))
 }
 
 type Int64Converter struct{}
@@ -125,35 +114,19 @@ type Int64Converter struct{}
 func (Int64Converter) Size() int { return 8 }
 
 func (Int64Converter) ToBytesLittleEndian(value *int64, bytes []byte, index int) {
-	v := uint64(*value)
-	bytes[index] = byte(v)
-	bytes[index+1] = byte(v >> 8)
-	bytes[index+2] = byte(v >> 16)
-	bytes[index+3] = byte(v >> 24)
-	bytes[index+4] = byte(v >> 32)
-	bytes[index+5] = byte(v >> 40)
-	bytes[index+6] = byte(v >> 48)
-	bytes[index+7] = byte(v >> 56)
+	binary.LittleEndian.PutUint64(bytes[index:], uint64(*value))
 }
 
 func (Int64Converter) FromBytesLittleEndian(receiver *int64, bytes []byte, index int) {
-	*receiver = int64(uint64(bytes[index]) | uint64(bytes[index+1])<<8 | uint64(bytes[index+2])<<16 | uint64(bytes[index+3])<<24 | uint64(bytes[index+4])<<32 | uint64(bytes[index+5])<<40 | uint64(bytes[index+6])<<48 | uint64(bytes[index+7])<<56)
+	*receiver = int64(binary.LittleEndian.Uint64(bytes[index:]))
 }
 
 func (Int64Converter) ToBytesBigEndian(value *int64, bytes []byte, index int) {
-	v := uint64(*value)
-	bytes[index] = byte(v >> 56)
-	bytes[index+1] = byte(v >> 48)
-	bytes[index+2] = byte(v >> 40)
-	bytes[index+3] = byte(v >> 32)
-	bytes[index+4] = byte(v >> 24)
-	bytes[index+5] = byte(v >> 16)
-	bytes[index+6] = byte(v >> 8)
-	bytes[index+7] = byte(v)
+	binary.BigEndian.PutUint64(bytes[index:], uint64(*value))
 }
 
 func (Int64Converter) FromBytesBigEndian(receiver *int64, bytes []byte, index int) {
-	*receiver = int64(uint64(bytes[index])<<56 | uint64(bytes[index+1])<<48 | uint64(bytes[index+2])<<40 | uint64(bytes[index+3])<<32 | uint64(bytes[index+4])<<24 | uint64(bytes[index+5])<<16 | uint64(bytes[index+6])<<8 | uint64(bytes[index+7]))
+	*receiver = int64(binary.BigEndian.Uint64(bytes[index:]))
 }
 
 type Uint8Converter struct{}
@@ -181,21 +154,19 @@ type Uint16Converter struct{}
 func (Uint16Converter) Size() int { return 2 }
 
 func (Uint16Converter) ToBytesLittleEndian(value *uint16, bytes []byte, index int) {
-	bytes[index] = byte(*value)
-	bytes[index+1] = byte(*value >> 8)
+	binary.LittleEndian.PutUint16(bytes[index:], *value)
 }
 
 func (Uint16Converter) FromBytesLittleEndian(receiver *uint16, bytes []byte, index int) {
-	*receiver = uint16(bytes[index]) | uint16(bytes[index+1])<<8
+	*receiver = binary.LittleEndian.Uint16(bytes[index:])
 }
 
 func (Uint16Converter) ToBytesBigEndian(value *uint16, bytes []byte, index int) {
-	bytes[index] = byte(*value >> 8)
-	bytes[index+1] = byte(*value)
+	binary.BigEndian.PutUint16(bytes[index:], *value)
 }
 
 func (Uint16Converter) FromBytesBigEndian(receiver *uint16, bytes []byte, index int) {
-	*receiver = uint16(bytes[index])<<8 | uint16(bytes[index+1])
+	*receiver = binary.BigEndian.Uint16(bytes[index:])
 }
 
 type Uint32Converter struct{}
@@ -203,25 +174,19 @@ type Uint32Converter struct{}
 func (Uint32Converter) Size() int { return 4 }
 
 func (Uint32Converter) ToBytesLittleEndian(value *uint32, bytes []byte, index int) {
-	bytes[index] = byte(*value)
-	bytes[index+1] = byte(*value >> 8)
-	bytes[index+2] = byte(*value >> 16)
-	bytes[index+3] = byte(*value >> 24)
+	binary.LittleEndian.PutUint32(bytes[index:], *value)
 }
 
 func (Uint32Converter) FromBytesLittleEndian(receiver *uint32, bytes []byte, index int) {
-	*receiver = uint32(bytes[index]) | uint32(bytes[index+1])<<8 | uint32(bytes[index+2])<<16 | uint32(bytes[index+3])<<24
+	*receiver = binary.LittleEndian.Uint32(bytes[index:])
 }
 
 func (Uint32Converter) ToBytesBigEndian(value *uint32, bytes []byte, index int) {
-	bytes[index] = byte(*value >> 24)
-	bytes[index+1] = byte(*value >> 16)
-	bytes[index+2] = byte(*value >> 8)
-	bytes[index+3] = byte(*value)
+	binary.BigEndian.PutUint32(bytes[index:], *value)
 }
 
 func (Uint32Converter) FromBytesBigEndian(receiver *uint32, bytes []byte, index int) {
-	*receiver = uint32(bytes[index])<<24 | uint32(bytes[index+1])<<16 | uint32(bytes[index+2])<<8 | uint32(bytes[index+3])
+	*receiver = binary.BigEndian.Uint32(bytes[index:])
 }
 
 type Uint64Converter struct{}
@@ -229,33 +194,19 @@ type Uint64Converter struct{}
 func (Uint64Converter) Size() int { return 8 }
 
 func (Uint64Converter) ToBytesLittleEndian(value *uint64, bytes []byte, index int) {
-	bytes[index] = byte(*value)
-	bytes[index+1] = byte(*value >> 8)
-	bytes[index+2] = byte(*value >> 16)
-	bytes[index+3] = byte(*value >> 24)
-	bytes[index+4] = byte(*value >> 32)
-	bytes[index+5] = byte(*value >> 40)
-	bytes[index+6] = byte(*value >> 48)
-	bytes[index+7] = byte(*value >> 56)
+	binary.LittleEndian.PutUint64(bytes[index:], *value)
 }
 
 func (Uint64Converter) FromBytesLittleEndian(receiver *uint64, bytes []byte, index int) {
-	*receiver = uint64(bytes[index]) | uint64(bytes[index+1])<<8 | uint64(bytes[index+2])<<16 | uint64(bytes[index+3])<<24 | uint64(bytes[index+4])<<32 | uint64(bytes[index+5])<<40 | uint64(bytes[index+6])<<48 | uint64(bytes[index+7])<<56
+	*receiver = binary.LittleEndian.Uint64(bytes[index:])
 }
 
 func (Uint64Converter) ToBytesBigEndian(value *uint64, bytes []byte, index int) {
-	bytes[index] = byte(*value >> 56)
-	bytes[index+1] = byte(*value >> 48)
-	bytes[index+2] = byte(*value >> 40)
-	bytes[index+3] = byte(*value >> 32)
-	bytes[index+4] = byte(*value >> 24)
-	bytes[index+5] = byte(*value >> 16)
-	bytes[index+6] = byte(*value >> 8)
-	bytes[index+7] = byte(*value)
+	binary.BigEndian.PutUint64(bytes[index:], *value)
 }
 
 func (Uint64Converter) FromBytesBigEndian(receiver *uint64, bytes []byte, index int) {
-	*receiver = uint64(bytes[index])<<56 | uint64(bytes[index+1])<<48 | uint64(bytes[index+2])<<40 | uint64(bytes[index+3])<<32 | uint64(bytes[index+4])<<24 | uint64(bytes[index+5])<<16 | uint64(bytes[index+6])<<8 | uint64(bytes[index+7])
+	*receiver = binary.BigEndian.Uint64(bytes[index:])
 }
 
 type Float32Converter struct{}
@@ -263,29 +214,19 @@ type Float32Converter struct{}
 func (Float32Converter) Size() int { return 4 }
 
 func (Float32Converter) ToBytesLittleEndian(value *float32, bytes []byte, index int) {
-	v := math.Float32bits(*value)
-	bytes[index] = byte(v)
-	bytes[index+1] = byte(v >> 8)
-	bytes[index+2] = byte(v >> 16)
-	bytes[index+3] = byte(v >> 24)
+	binary.LittleEndian.PutUint32(bytes[index:], math.Float32bits(*value))
 }
 
 func (Float32Converter) FromBytesLittleEndian(receiver *float32, bytes []byte, index int) {
-	v := uint32(bytes[index]) | uint32(bytes[index+1])<<8 | uint32(bytes[index+2])<<16 | uint32(bytes[index+3])<<24
-	*receiver = math.Float32frombits(v)
+	*receiver = math.Float32frombits(binary.LittleEndian.Uint32(bytes[index:]))
 }
 
 func (Float32Converter) ToBytesBigEndian(value *float32, bytes []byte, index int) {
-	v := math.Float32bits(*value)
-	bytes[index] = byte(v >> 24)
-	bytes[index+1] = byte(v >> 16)
-	bytes[index+2] = byte(v >> 8)
-	bytes[index+3] = byte(v)
+	binary.BigEndian.PutUint32(bytes[index:], math.Float32bits(*value))
 }
 
 func (Float32Converter) FromBytesBigEndian(receiver *float32, bytes []byte, index int) {
-	v := uint32(bytes[index])<<24 | uint32(bytes[index+1])<<16 | uint32(bytes[index+2])<<8 | uint32(bytes[index+3])
-	*receiver = math.Float32frombits(v)
+	*receiver = math.Float32frombits(binary.BigEndian.Uint32(bytes[index:]))
 }
 
 type Float64Converter struct{}
@@ -293,37 +234,19 @@ type Float64Converter struct{}
 func (Float64Converter) Size() int { return 8 }
 
 func (Float64Converter) ToBytesLittleEndian(value *float64, bytes []byte, index int) {
-	v := math.Float64bits(*value)
-	bytes[index] = byte(v)
-	bytes[index+1] = byte(v >> 8)
-	bytes[index+2] = byte(v >> 16)
-	bytes[index+3] = byte(v >> 24)
-	bytes[index+4] = byte(v >> 32)
-	bytes[index+5] = byte(v >> 40)
-	bytes[index+6] = byte(v >> 48)
-	bytes[index+7] = byte(v >> 56)
+	binary.LittleEndian.PutUint64(bytes[index:], math.Float64bits(*value))
 }
 
 func (Float64Converter) FromBytesLittleEndian(receiver *float64, bytes []byte, index int) {
-	v := uint64(bytes[index]) | uint64(bytes[index+1])<<8 | uint64(bytes[index+2])<<16 | uint64(bytes[index+3])<<24 | uint64(bytes[index+4])<<32 | uint64(bytes[index+5])<<40 | uint64(bytes[index+6])<<48 | uint64(bytes[index+7])<<56
-	*receiver = math.Float64frombits(v)
+	*receiver = math.Float64frombits(binary.LittleEndian.Uint64(bytes[index:]))
 }
 
 func (Float64Converter) ToBytesBigEndian(value *float64, bytes []byte, index int) {
-	v := math.Float64bits(*value)
-	bytes[index] = byte(v >> 56)
-	bytes[index+1] = byte(v >> 48)
-	bytes[index+2] = byte(v >> 40)
-	bytes[index+3] = byte(v >> 32)
-	bytes[index+4] = byte(v >> 24)
-	bytes[index+5] = byte(v >> 16)
-	bytes[index+6] = byte(v >> 8)
-	bytes[index+7] = byte(v)
+	binary.BigEndian.PutUint64(bytes[index:], math.Float64bits(*value))
 }
 
 func (Float64Converter) FromBytesBigEndian(receiver *float64, bytes []byte, index int) {
-	v := uint64(bytes[index])<<56 | uint64(bytes[index+1])<<48 | uint64(bytes[index+2])<<40 | uint64(bytes[index+3])<<32 | uint64(bytes[index+4])<<24 | uint64(bytes[index+5])<<16 | uint64(bytes[index+6])<<8 | uint64(bytes[index+7])
-	*receiver = math.Float64frombits(v)
+	*receiver = math.Float64frombits(binary.BigEndian.Uint64(bytes[index:]))
 }
 
 func String(length int) StringConverter {
