@@ -241,7 +241,7 @@ func writeWordStore(buffer *bytes.Buffer, base, word string, byteCount int, litt
 			fmt.Fprintf(buffer, "bytes[%s+%d] = byte(%s)\n", base, position, value)
 		} else {
 			bits := chunk * 8
-			fmt.Fprintf(buffer, "%s.PutUint%d(bytes[%s+%d:], uint%d(%s))\n", order, bits, base, position, bits, value)
+			fmt.Fprintf(buffer, "%s.PutUint%d(bytes[%s+%d:%s+%d], uint%d(%s))\n", order, bits, base, position, base, position+chunk, bits, value)
 		}
 
 		sourceByte += chunk
