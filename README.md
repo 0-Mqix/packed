@@ -1,20 +1,30 @@
 # packed
 
-A Go code generator for binary data structures with precise memory layout control.
+**Define your binary layout once. Get fast, zero-reflection Go code that matches it byte-for-byte.**
 
-You describe your structures once with a small builder DSL, run code generation, and get plain Go structs with fast, allocation-free `ToBytes` / `FromBytes` methods — no reflection at runtime.
+`packed` is a code generator for binary data structures. You describe your wire format with a small builder DSL — down to individual bits — and `packed` generates plain Go structs with hand-tight `ToBytes` / `FromBytes` methods. No reflection, no allocations, no interface dispatch at runtime: every offset is precomputed at generation time, and bit fields compile down to raw shifts and masks. The output is the code you would have written by hand, if you had the patience to get every offset and mask right — and to keep them right every time the format changes.
 
-Bit-field runs reproduce the layout of a C `struct __attribute__((__packed__))` byte-for-byte, in both little- and big-endian. That makes `packed` a drop-in for encoding and decoding messages from microcontrollers (e.g. ARM) that send packed C structs over the wire.
+Where `packed` really shines is talking to microcontrollers. Its bit-field layout reproduces C `struct __attribute__((__packed__))` byte-for-byte, in both little- and big-endian. If your firmware sends this:
 
-## Features
+```c
+struct __attribute__((__packed__)) status {
+    uint8_t online   : 1;
+    uint8_t charging : 1;
+    uint8_t error    : 3;
+    uint8_t signal   : 3;
+};
+```
 
-- **Code generation, not reflection** — generated `Size()`, `ToBytes()`, and `FromBytes()` methods are plain Go
-- **Bit fields** — pack booleans and small integers down to the bit, with C `__packed__`-compatible layout
-- **Endianness control** — per struct, with per-field overrides
-- **Nested structs and fixed-size arrays** — including nested arrays like `Array(3, Array(3, Float64))`
-- **Fixed-length strings** — null-padded on write, null-trimmed on read
-- **Enums via casting** — map an integer field onto your own enum type
-- **Extensible** — plug in custom types and converters, and extend the generator with hooks
+then this definition on the Go side decodes it — same bits, same bytes, no manual masking:
+
+```go
+Struct("Status", true,
+    Field("Online", Bit),
+    Field("Charging", Bit),
+    Field("ErrorCode", Bits[uint8](3)),
+    Field("SignalStrength", Bits[uint8](3)),
+)
+```
 
 ## Install
 
@@ -22,9 +32,9 @@ Bit-field runs reproduce the layout of a C `struct __attribute__((__packed__))` 
 go get github.com/0-Mqix/packed
 ```
 
-## Quick Start
+## From Definition to Working Code
 
-**1.** Write a `generate.go` file (excluded from normal builds with `//go:build ignore`) that defines your structures:
+Say your IoT devices report telemetry: a device ID, two sensor readings, and that packed status byte. Write a `generate.go` (kept out of normal builds with `//go:build ignore`) that describes the packet:
 
 ```go
 //go:build ignore
@@ -34,195 +44,151 @@ package main
 import . "github.com/0-Mqix/packed"
 
 func main() {
-    Struct("Header", true, // true = little-endian
-        Field("Version", Uint8, Tag("json", "version")),
-        Field("Length", Uint32, Tag("json", "length")),
-        Field("Name", String(16), Tag("json", "name")),
+    Struct("Telemetry", true, // true = little-endian
+        Field("DeviceID", Uint16, Tag("json", "device_id")),
+        Field("Temperature", Float32, Tag("json", "temperature")),
+        Field("Humidity", Float32, Tag("json", "humidity")),
+        Field("Status", Struct("Status", true,
+            Field("Online", Bit),
+            Field("Charging", Bit),
+            Field("ErrorCode", Bits[uint8](3)),
+            Field("SignalStrength", Bits[uint8](3)),
+        )),
     )
 
-    Generate("output.go", "mypackage")
+    Generate("telemetry.go", "mypackage")
 }
 ```
 
-**2.** Run it:
-
-```bash
-go run generate.go
-```
-
-Or wire it up with `go:generate`:
+Run `go run generate.go` (or hook it up with `//go:generate`) and you get real, readable Go. This is the actual output:
 
 ```go
-//go:generate go run generate.go
-```
-
-**3.** Use the generated structs:
-
-```go
-instance := Header{Version: 1, Length: 42, Name: "hello"}
-buf := make([]byte, instance.Size())
-instance.ToBytes(buf, 0)
-
-var result Header
-result.FromBytes(buf, 0)
-```
-
-The `index` parameter lets you pack multiple structs into the same byte slice at different offsets.
-
-## What the Generated Code Looks Like
-
-For this definition:
-
-```go
-Struct("Header", true,
-    Field("Version", Uint8, Tag("json", "version")),
-    Field("Length", Uint32, Tag("json", "length")),
-    Field("Name", String(8), Tag("json", "name")),
-)
-
-Struct("Flags", true,
-    Field("Active", Bit),
-    Field("Priority", Bits[uint8](3)),
-    Field("Mode", Bits[uint8](4)),
-)
-```
-
-the generator emits plain, readable Go — offsets are precomputed and bit fields compile down to shifts and masks:
-
-```go
-// Code generated by github.com/0-mqix/packed; DO NOT EDIT.
-
-package demo
-
-var (
-    c0 = &packed.StringConverter{Length: 8}
-    c1 = &packed.Uint8Converter{}
-    c2 = &packed.Uint32Converter{}
-)
-
-type Flags struct {
-    Active   bool
-    Priority uint8
-    Mode     uint8
+type Status struct {
+    Online         bool
+    Charging       bool
+    ErrorCode      uint8
+    SignalStrength uint8
 }
 
-func (reciever *Flags) Size() int {
+func (reciever *Status) Size() int {
     return 1
 }
 
-func (reciever *Flags) ToBytes(bytes []byte, index int) {
+func (reciever *Status) ToBytes(bytes []byte, index int) {
     var b0 uint64
-    b0 |= (uint64(*(*uint8)(unsafe.Pointer(&reciever.Active))) & 1) << 0
-    b0 |= (uint64(reciever.Priority) & 0x7) << 1
-    b0 |= (uint64(reciever.Mode) & 0xF) << 4
+    b0 |= (uint64(*(*uint8)(unsafe.Pointer(&reciever.Online))) & 1) << 0
+    b0 |= (uint64(*(*uint8)(unsafe.Pointer(&reciever.Charging))) & 1) << 1
+    b0 |= (uint64(reciever.ErrorCode) & 0x7) << 2
+    b0 |= (uint64(reciever.SignalStrength) & 0x7) << 5
     bytes[index+0+0] = byte(b0)
 }
 
-func (reciever *Flags) FromBytes(bytes []byte, index int) {
+func (reciever *Status) FromBytes(bytes []byte, index int) {
     var b0 uint64
     b0 |= uint64(bytes[index+0+0]) << 0
-    reciever.Active = ((b0 >> 0) & 0x1) != 0
-    reciever.Priority = uint8(uint64((b0 >> 1) & 0x7))
-    reciever.Mode = uint8(uint64((b0 >> 4) & 0xF))
+    reciever.Online = ((b0 >> 0) & 0x1) != 0
+    reciever.Charging = ((b0 >> 1) & 0x1) != 0
+    reciever.ErrorCode = uint8(uint64((b0 >> 2) & 0x7))
+    reciever.SignalStrength = uint8(uint64((b0 >> 5) & 0x7))
 }
 
-type Header struct {
-    Version uint8  `json:"version"`
-    Length  uint32 `json:"length"`
-    Name    string `json:"name"`
+type Telemetry struct {
+    DeviceID    uint16  `json:"device_id"`
+    Temperature float32 `json:"temperature"`
+    Humidity    float32 `json:"humidity"`
+    Status      Status
 }
 
-func (reciever *Header) Size() int {
-    return 13
+func (reciever *Telemetry) Size() int {
+    return 11
 }
 
-func (reciever *Header) ToBytes(bytes []byte, index int) {
-    c1.ToBytesLittleEndian(&reciever.Version, bytes, index+0)
-    c2.ToBytesLittleEndian(&reciever.Length, bytes, index+1)
-    c0.ToBytesLittleEndian(&reciever.Name, bytes, index+5)
+func (reciever *Telemetry) ToBytes(bytes []byte, index int) {
+    c1.ToBytesLittleEndian(&reciever.DeviceID, bytes, index+0)
+    c0.ToBytesLittleEndian(&reciever.Temperature, bytes, index+2)
+    c0.ToBytesLittleEndian(&reciever.Humidity, bytes, index+6)
+    var b0 uint64
+    b0 |= (uint64(*(*uint8)(unsafe.Pointer(&reciever.Status.Online))) & 1) << 0
+    b0 |= (uint64(*(*uint8)(unsafe.Pointer(&reciever.Status.Charging))) & 1) << 1
+    b0 |= (uint64(reciever.Status.ErrorCode) & 0x7) << 2
+    b0 |= (uint64(reciever.Status.SignalStrength) & 0x7) << 5
+    bytes[index+10+0] = byte(b0)
 }
 
-func (reciever *Header) FromBytes(bytes []byte, index int) {
-    c1.FromBytesLittleEndian(&reciever.Version, bytes, index+0)
-    c2.FromBytesLittleEndian(&reciever.Length, bytes, index+1)
-    c0.FromBytesLittleEndian(&reciever.Name, bytes, index+5)
+func (reciever *Telemetry) FromBytes(bytes []byte, index int) {
+    c1.FromBytesLittleEndian(&reciever.DeviceID, bytes, index+0)
+    c0.FromBytesLittleEndian(&reciever.Temperature, bytes, index+2)
+    c0.FromBytesLittleEndian(&reciever.Humidity, bytes, index+6)
+    var b0 uint64
+    b0 |= uint64(bytes[index+10+0]) << 0
+    reciever.Status.Online = ((b0 >> 0) & 0x1) != 0
+    reciever.Status.Charging = ((b0 >> 1) & 0x1) != 0
+    reciever.Status.ErrorCode = uint8(uint64((b0 >> 2) & 0x7))
+    reciever.Status.SignalStrength = uint8(uint64((b0 >> 5) & 0x7))
 }
 ```
 
-Note how the three bit fields of `Flags` (1 + 3 + 4 bits) collapse into a single byte, exactly as a packed C struct would lay them out.
+Notice what happened: four status fields collapsed into one byte of shift-and-mask code, every offset is a compile-time constant, and the nested `Status` was inlined straight into `Telemetry`'s methods — the whole 11-byte packet encodes and decodes without a single reflection call, allocation, or loop. This is code the Go compiler loves to optimize.
 
-## Examples
-
-### Bit-packed flags
-
-Adjacent bit fields are packed together bit-by-bit into a single run — here, 1 + 3 + 4 bits fit in exactly one byte:
+Decoding a packet off the wire is now one line:
 
 ```go
-Struct("Flags", false, // big-endian
-    Field("Active", Bit),               // single-bit bool
-    Field("Priority", Bits[uint8](3)),  // 3-bit uint8
-    Field("Mode", Bits[uint8](4)),      // 4-bit uint8
-)
+var t Telemetry
+t.FromBytes(payload, 0)
+
+fmt.Printf("device %d: %.1f°C, signal %d/7\n", t.DeviceID, t.Temperature, t.Status.SignalStrength)
 ```
 
-A run can be any length — there is no 64-bit limit — and the whole run occupies `ceil(totalBits/8)` bytes, exactly like C `__attribute__((__packed__))`. Signed bit fields are sign-extended on read.
-
-### Nested structs and arrays
+And encoding is just as direct — the `index` parameter lets you pack a batch of readings back-to-back into one buffer:
 
 ```go
-Struct("Packet", true,
-    Field("Header", Struct("PacketHeader", true,
-        Field("ID", Uint16),
-        Field("Type", Uint8),
-    )),
-    Field("Payload", Array(64, Uint8)),
-)
+readings := []Telemetry{ /* ... */ }
+buf := make([]byte, len(readings)*readings[0].Size())
 
-Struct("Matrix", true,
-    Field("Data", Array(3, Array(3, Float64))),
-)
+for i := range readings {
+    readings[i].ToBytes(buf, i*readings[i].Size())
+}
 ```
 
-### Enums
+## Beyond the Basics
 
-`Cast` converts between a converter's wire type and your own type — handy for enums:
+Real wire formats are rarely just a few integers, so the DSL covers the rest of what firmware tends to throw at you.
+
+**Fixed-size arrays** — including nested ones — map to Go arrays. A 64-byte payload buffer or a 3×3 calibration matrix is one field each:
 
 ```go
-Struct("Command", true,
-    Field("Action", Cast[types.ActionEnum](Int32)), // stored as int32, typed as ActionEnum
-)
+Field("Payload", Array(64, Uint8))
+Field("Calibration", Array(3, Array(3, Float64)))
 ```
 
-### Endianness overrides
+**Fixed-length strings** are null-padded on write and null-trimmed on read, so a 16-byte device-name field just becomes a Go `string`:
 
 ```go
-Struct("Mixed", true, // little-endian by default...
-    Field("A", Uint32),
-    Field("B", Uint32, LittleEndian(false)), // ...but this field is big-endian
+Field("Name", String(16))
+```
+
+**Enums** come out properly typed instead of as bare integers. `Cast` stores the field as the converter's wire type but exposes it as your own type:
+
+```go
+Field("Action", Cast[types.ActionEnum](Int32)) // 4 bytes on the wire, ActionEnum in Go
+```
+
+**Endianness** is set per struct and can be overridden per field — useful for those protocols where one vendor's field is inexplicably big-endian in an otherwise little-endian packet:
+
+```go
+Struct("Mixed", true,
+    Field("Counter", Uint32),
+    Field("Checksum", Uint32, LittleEndian(false)), // this one field is big-endian
 )
 ```
 
-## Built-in Types
+**Bit runs of any length.** Adjacent `Bit`/`Bits` fields are packed into a single contiguous run occupying `ceil(totalBits/8)` bytes — there is no 64-bit limit, and a field may straddle a 64-bit word boundary mid-run without you ever noticing. Signed bit fields are sign-extended on read, exactly as C does it. The layout rules match C `__attribute__((__packed__))` precisely: fields pack consecutively with bit alignment 1, little-endian fills from the least-significant bit up, big-endian from the most-significant bit down, and the layout depends only on each field's width and signedness — not its declared integer type.
 
-| Converter | Go Type   | Size (bytes) |
-|-----------|-----------|--------------|
-| `Boolean` | `bool`    | 1            |
-| `Int8`    | `int8`    | 1            |
-| `Int16`   | `int16`   | 2            |
-| `Int32`   | `int32`   | 4            |
-| `Int64`   | `int64`   | 8            |
-| `Uint8`   | `uint8`   | 1            |
-| `Uint16`  | `uint16`  | 2            |
-| `Uint32`  | `uint32`  | 4            |
-| `Uint64`  | `uint64`  | 8            |
-| `Float32` | `float32` | 4            |
-| `Float64` | `float64` | 8            |
-
-Plus `String(length)` for fixed-length strings, `Bit` / `Bits[T](n)` for bit fields, `Array(n, type)` for fixed-size arrays, and nested `Struct(...)` definitions.
+**The wire types you'd expect**: `Uint8`–`Uint64`, `Int8`–`Int64`, `Float32`, `Float64`, and `Boolean`, each mapping to its natural Go type at its natural size.
 
 ## Custom Types
 
-If the built-ins aren't enough, you can plug in your own types.
+When the built-ins run out, you can teach `packed` your own types.
 
 ### A type that serializes itself (`TypeInterface`)
 
@@ -359,25 +325,17 @@ Generate("output.go", "mypackage",
 )
 ```
 
-## C Compatibility
-
-Bit-field runs match what a C compiler produces for a `struct` marked `__attribute__((__packed__))`:
-
-- Fields are packed consecutively with a bit alignment of 1 — no padding between fields
-- A run occupies `ceil(totalBits/8)` bytes
-- Layout depends only on each field's bit width and signedness, not its declared integer type
-- Little-endian fills from the least-significant bit up; big-endian from the most-significant bit down
-- A field may straddle a 64-bit boundary inside a long run; this is handled transparently
-
 ## Constraints
 
-- Struct names and field names must be unique (duplicates panic at generation time)
-- Array elements cannot be bare bit fields
-- A `Bits` bit size cannot exceed its underlying integer type's width (as in C, where an over-wide bit field is a compile error)
+`packed` trades flexibility for layout guarantees, so a few rules are enforced — loudly, at generation time, never silently at runtime:
+
+- Struct names and field names must be unique (duplicates panic)
 - All sizes are fixed at definition time — there are no variable-length fields
-- Bit fields inherit the struct's endianness and cannot be overridden per-field
-- Values that overflow a bit field's width are silently truncated (masked)
+- Array elements cannot be bare bit fields
+- A `Bits` size cannot exceed its underlying integer type's width (as in C, where an over-wide bit field is a compile error)
+- Bit fields inherit the struct's endianness and cannot be overridden per field
+- Values that overflow a bit field's width are silently truncated (masked), matching C behavior
 
 ## Documentation
 
-The complete API reference lives in [llms.md](llms.md), covering every builder function, interface, and generation hook in detail.
+The complete API reference — every builder function, interface, and generation hook — lives in [llms.md](llms.md).
