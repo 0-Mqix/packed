@@ -192,34 +192,34 @@ When the built-ins run out, you can teach `packed` your own types.
 
 ### A type that serializes itself (`TypeInterface`)
 
-Implement `Size()` plus the four `ToBytes*`/`FromBytes*` methods, and the type can be used directly as a field. The generated struct field keeps your type:
+Implement `Size()` plus the four `ToBytes*`/`FromBytes*` methods, and the type can be used directly as a field. The generated struct field keeps your type — so a device's 4-byte unix timestamp can land in your struct as a real `time.Time`:
 
 ```go
-type Color struct {
-    R, G, B uint8
+type Timestamp struct {
+    time.Time
 }
 
-func (c *Color) Size() int { return 3 }
+func (t *Timestamp) Size() int { return 4 }
 
-func (c *Color) ToBytesLittleEndian(bytes []byte, index int) {
-    bytes[index] = c.R
-    bytes[index+1] = c.G
-    bytes[index+2] = c.B
+func (t *Timestamp) ToBytesLittleEndian(bytes []byte, index int) {
+    binary.LittleEndian.PutUint32(bytes[index:], uint32(t.Unix()))
 }
 
-func (c *Color) FromBytesLittleEndian(bytes []byte, index int) {
-    c.R = bytes[index]
-    c.G = bytes[index+1]
-    c.B = bytes[index+2]
+func (t *Timestamp) FromBytesLittleEndian(bytes []byte, index int) {
+    t.Time = time.Unix(int64(binary.LittleEndian.Uint32(bytes[index:])), 0)
 }
 
-// single-byte fields look the same in both byte orders
-func (c *Color) ToBytesBigEndian(bytes []byte, index int)   { c.ToBytesLittleEndian(bytes, index) }
-func (c *Color) FromBytesBigEndian(bytes []byte, index int) { c.FromBytesLittleEndian(bytes, index) }
+func (t *Timestamp) ToBytesBigEndian(bytes []byte, index int) {
+    binary.BigEndian.PutUint32(bytes[index:], uint32(t.Unix()))
+}
+
+func (t *Timestamp) FromBytesBigEndian(bytes []byte, index int) {
+    t.Time = time.Unix(int64(binary.BigEndian.Uint32(bytes[index:])), 0)
+}
 ```
 
 ```go
-Field("Color", Color{})
+Field("LastSeen", Timestamp{}) // 4 bytes on the wire, time.Time in Go
 ```
 
 ### An external converter (`ConverterInterface[Receiver]`)
