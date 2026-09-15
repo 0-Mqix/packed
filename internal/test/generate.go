@@ -10,6 +10,7 @@ import (
 	"reflect"
 
 	. "github.com/0-Mqix/packed"
+	"github.com/0-Mqix/packed/generate"
 	"github.com/0-Mqix/packed/internal/test/types"
 )
 
@@ -160,7 +161,7 @@ func main() {
 
 	generated := path.Join(workingDirectory, "/output.go")
 
-	Generate(generated, "packed", func(buffer *bytes.Buffer, name string, properties []Property) {
+	generate.Generate(generated, "packed", func(buffer *bytes.Buffer, name string, properties []Property) {
 		for _, p := range properties {
 			switch p.Type.Kind() {
 			case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,

@@ -41,7 +41,10 @@ Say your IoT devices report telemetry: a device ID, two sensor readings, and tha
 
 package main
 
-import . "github.com/0-Mqix/packed"
+import (
+    . "github.com/0-Mqix/packed"
+    "github.com/0-Mqix/packed/generate"
+)
 
 func main() {
     Struct("Telemetry", true, // true = little-endian
@@ -56,7 +59,7 @@ func main() {
         )),
     )
 
-    Generate("telemetry.go", "mypackage")
+    generate.Generate("telemetry.go", "mypackage")
 }
 ```
 
@@ -312,7 +315,7 @@ Field("Flags", Bits[uint8](8, BitArrayConverter{})) // generated field: Flags [8
 Hooks run after each struct's core methods are generated, letting you emit extra code — getters, stringers, validation, whatever you need:
 
 ```go
-Generate("output.go", "mypackage",
+generate.Generate("output.go", "mypackage",
     func(buffer *bytes.Buffer, name string, properties []Property) {
         for _, p := range properties {
             switch p.Type.Kind() {

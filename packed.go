@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"os"
 	"reflect"
 	"sort"
-
-	"golang.org/x/tools/imports"
 )
 
 func sortedKeys[V any](m map[string]V) []string {
@@ -184,7 +181,13 @@ func (p *packedStruct) collectProperties() []Property {
 	return result
 }
 
-func Generate(outputFile string, packageName string, hooks ...GenerateHook) {
+// Source renders the Go source for every registered structure, unformatted
+// and with an import block that may be incomplete: converters referenced by
+// their reflected name are not tracked. Formatting and import resolution
+// live in the generate package, which keeps golang.org/x/tools (and the go/*
+// packages it initialises) out of binaries that only link the generated
+// code.
+func Source(packageName string, hooks ...GenerateHook) []byte {
 
 	buffer := &bytes.Buffer{}
 
@@ -260,16 +263,5 @@ func Generate(outputFile string, packageName string, hooks ...GenerateHook) {
 		}
 	}
 
-	result, err := imports.Process("", buffer.Bytes(), &imports.Options{
-		AllErrors:  true,
-		FormatOnly: false,
-		Comments:   true,
-	})
-
-	if err != nil {
-		os.WriteFile(outputFile, buffer.Bytes(), 0644)
-		panic("failed to generate code")
-	}
-
-	os.WriteFile(outputFile, result, 0644)
+	return buffer.Bytes()
 }

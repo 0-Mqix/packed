@@ -65,9 +65,13 @@ Fixed-length string converter. Pads with null bytes on write, trims null bytes o
 
 Registers structures for code generation. Call this before `Generate` if you define structs separately from the `Generate` call. Note: `Struct()` already registers internally, so `Load` is only needed if you want explicit control.
 
-### `Generate(outputFile string, packageName string, hooks ...GenerateHook)`
+### `generate.Generate(outputFile string, packageName string, hooks ...GenerateHook)`
 
-Generates the output Go file with all registered structures. Runs `goimports` and `gofmt` on the result.
+From the subpackage `github.com/0-Mqix/packed/generate`. Generates the output Go file with all registered structures and runs `goimports` and `gofmt` on the result. It is the only part of packed that depends on `golang.org/x/tools`; import it from generator programs only, so shipped binaries that link the generated code do not carry the `go/*` toolchain packages.
+
+### `Source(packageName string, hooks ...GenerateHook) []byte`
+
+The unformatted source `generate.Generate` formats; for callers that want to run their own formatter.
 
 ## Built-in Converters
 
@@ -221,6 +225,7 @@ import (
     "reflect"
 
     . "github.com/0-Mqix/packed"
+    "github.com/0-Mqix/packed/generate"
     "myproject/types"
 )
 
@@ -258,7 +263,7 @@ func main() {
         Field("Data", Array(3, Array(3, Float64))),
     )
 
-    Generate("output.go", "mypackage",
+    generate.Generate("output.go", "mypackage",
         // Optional hook: generate getters
         func(buffer *bytes.Buffer, name string, properties []Property) {
             for _, p := range properties {
