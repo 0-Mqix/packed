@@ -37,6 +37,10 @@ var (
 	imported                = map[string]bool{}
 	converterIdentifiers    = map[string]string{}
 	converterLastIdentifier = 0
+	// converterPrefix starts the names of the converter variables: the
+	// dynamic layer's file uses its own, so it can share a package with a
+	// file the DSL generated.
+	converterPrefix = "c"
 )
 
 type TypeInterface interface {
@@ -115,7 +119,7 @@ func getConverterName(hash string) string {
 		return name
 	}
 
-	name := fmt.Sprintf("c%d", converterLastIdentifier)
+	name := fmt.Sprintf("%s%d", converterPrefix, converterLastIdentifier)
 
 	converterIdentifiers[hash] = name
 
@@ -148,6 +152,8 @@ func (p *packedStruct) collectProperties() []Property {
 			for _, field := range group.fields {
 				var t reflect.Type
 				switch field.bitFieldKind {
+				case bitFieldKindTag:
+					continue
 				case bitFieldKindBitsType, bitFieldKindBitsConverter:
 					t = field.bitsTargetReflection.Elem()
 				default:
@@ -173,7 +179,17 @@ func (p *packedStruct) collectProperties() []Property {
 		case kindType:
 			result = append(result, Property{Name: property.name, Type: property.propertyType.Elem()})
 
-		case kindArray:
+		case kindEnum:
+			result = append(result, Property{Name: property.name, Type: property.packed.(packedEnum).reflection})
+
+		case kindVariableString:
+			if property.packed.(packedVariableString).Bytes {
+				result = append(result, Property{Name: property.name, Type: reflect.TypeFor[[]byte]()})
+			} else {
+				result = append(result, Property{Name: property.name, Type: reflect.TypeFor[string]()})
+			}
+
+		case kindArray, kindSlice:
 			continue
 		}
 	}
@@ -244,6 +260,11 @@ func Source(packageName string, hooks ...GenerateHook) []byte {
 
 	fmt.Fprintf(buffer, ")\n")
 
+	for _, name := range sortedKeys(enums) {
+		buffer.Write(enums[name].definition())
+		fmt.Fprintf(buffer, "\n")
+	}
+
 	for _, name := range sortedKeys(structs) {
 		packed := structs[name]
 		buffer.Write(packed.structDefinition())
@@ -261,6 +282,11 @@ func Source(packageName string, hooks ...GenerateHook) []byte {
 				hook(buffer, packed.name, properties)
 			}
 		}
+	}
+
+	for _, name := range sortedKeys(messageSets) {
+		buffer.Write(messageSets[name].definition())
+		fmt.Fprintf(buffer, "\n")
 	}
 
 	return buffer.Bytes()

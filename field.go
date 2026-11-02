@@ -17,6 +17,9 @@ const (
 	kindArray
 	kindBitField
 	kindBitFieldGroup
+	kindSlice
+	kindVariableString
+	kindEnum
 )
 
 type structTag struct {
@@ -35,6 +38,7 @@ type packedProperty struct {
 	littleEndian   bool
 	endianOverride bool
 	converter      *converterHash
+	dynamic        bool
 }
 
 type fieldOption func(*packedProperty)
@@ -101,6 +105,18 @@ func validatePropertyType(propertyType any) (kind, reflect.Type, any) {
 		return kindBitField, nil, propertyType
 	}
 
+	if _, ok := propertyType.(packedSlice); ok {
+		return kindSlice, nil, propertyType
+	}
+
+	if _, ok := propertyType.(packedVariableString); ok {
+		return kindVariableString, nil, propertyType
+	}
+
+	if _, ok := propertyType.(packedEnum); ok {
+		return kindEnum, nil, propertyType
+	}
+
 	if cast, ok := propertyType.(converterCast); ok {
 		return kindConverterCast, cast.target, propertyType
 	}
@@ -157,7 +173,9 @@ func Field(name string, propertyType any, options ...fieldOption) packedProperty
 		property.converter = &hash
 	}
 
-	if property.kind != kindBitField {
+	property.dynamic = isDynamic(property.kind, property.packed)
+
+	if property.kind != kindBitField && !property.dynamic {
 		property.size = property.packed.(interface{ Size() int }).Size()
 	}
 

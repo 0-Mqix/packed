@@ -26,8 +26,18 @@ func getArrayRecieverType(propertyType any) string {
 		return fmt.Sprintf("[%d]%s", array.Length, getArrayRecieverType(array.Element))
 	}
 
-	if kind == kindStruct {
+	switch kind {
+	case kindStruct:
 		return propertyType.(packedStruct).name
+	case kindSlice:
+		return propertyType.(packedSlice).recieverType
+	case kindVariableString:
+		if propertyType.(packedVariableString).Bytes {
+			return "[]byte"
+		}
+		return "string"
+	case kindEnum:
+		return propertyType.(packedEnum).name
 	}
 
 	return recieverType.String()
@@ -90,6 +100,17 @@ func (p *packedProperty) writeArrayElement(buffer *bytes.Buffer, structure *pack
 		array := p.packed.(packedArray)
 		array.write(buffer, structure, reciever, functionName, p.littleEndian, offsetVariable, depth+1)
 
+	case kindSlice:
+		p.packed.(packedSlice).write(buffer, structure, reciever, functionName, p.littleEndian, offsetVariable, depth+1)
+
+	case kindVariableString:
+		p.packed.(packedVariableString).write(buffer, reciever, functionName, p.littleEndian, offsetVariable)
+
+	case kindEnum:
+		enum := p.packed.(packedEnum)
+		enum.write(buffer, reciever, functionName, p.littleEndian, offsetVariable)
+		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, enum.size)
+
 	case kindType:
 		fmt.Fprintf(buffer, "%s.%s%s(bytes, %s)\n", reciever, functionName, endian, offsetVariable)
 		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, p.size)
@@ -118,40 +139,52 @@ func (a packedArray) write(buffer *bytes.Buffer, structure *packedStruct, reciev
 
 	fmt.Fprintf(buffer, "for %s := 0; %s < %d; %s++ {\n", indexVariable, indexVariable, a.Length, indexVariable)
 
-	endian := "LittleEndian"
+	writeElement(buffer, structure, functionName, a.ElementKind, a.Element, a.ElementSize, recieverVariable, littleEndian, offsetVariable, depth)
 
-	if !littleEndian {
-		endian = "BigEndian"
-	}
+	fmt.Fprintf(buffer, "}\n")
+}
 
-	switch a.ElementKind {
+func writeElement(buffer *bytes.Buffer, structure *packedStruct, functionName string, elementKind kind, element any, elementSize int, recieverVariable string, littleEndian bool, offsetVariable string, depth int) {
+
+	endian := endianName(littleEndian)
+
+	switch elementKind {
 
 	case kindStruct:
-		childStruct := a.Element.(packedStruct)
+		childStruct := element.(packedStruct)
 		for _, property := range childStruct.properties {
 			property.writeArrayElement(buffer, structure, functionName, recieverVariable, offsetVariable, depth)
 		}
 
 	case kindConverter:
-		hash := createConverterHash(a.Element)
+		hash := createConverterHash(element)
 		fmt.Fprintf(buffer, "%s.%s%s(&%s, bytes, %s)\n", getConverterName(hash.hash), functionName, endian, recieverVariable, offsetVariable)
-		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, a.ElementSize)
+		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, elementSize)
 
 	case kindConverterCast:
-		cast := a.Element.(converterCast)
+		cast := element.(converterCast)
 		cast.Write(buffer, structure, recieverVariable, functionName, littleEndian, offsetVariable)
 		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, cast.size)
 
 	case kindArray:
-		a.Element.(packedArray).write(buffer, structure, recieverVariable, functionName, littleEndian, offsetVariable, depth+1)
+		element.(packedArray).write(buffer, structure, recieverVariable, functionName, littleEndian, offsetVariable, depth+1)
+
+	case kindSlice:
+		element.(packedSlice).write(buffer, structure, recieverVariable, functionName, littleEndian, offsetVariable, depth+1)
+
+	case kindVariableString:
+		element.(packedVariableString).write(buffer, recieverVariable, functionName, littleEndian, offsetVariable)
+
+	case kindEnum:
+		enum := element.(packedEnum)
+		enum.write(buffer, recieverVariable, functionName, littleEndian, offsetVariable)
+		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, enum.size)
 
 	case kindType:
 		fmt.Fprintf(buffer, "%s.%s%s(bytes, %s)\n", recieverVariable, functionName, endian, offsetVariable)
-		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, a.ElementSize)
+		fmt.Fprintf(buffer, "%s += %d\n", offsetVariable, elementSize)
 
 	default:
 		panic("invalid property kind")
 	}
-
-	fmt.Fprintf(buffer, "}\n")
 }

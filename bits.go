@@ -42,6 +42,16 @@ const (
 	bitFieldKindBoolean
 	bitFieldKindBitsType
 	bitFieldKindBitsConverter
+	// bitFieldKindTag is a message set's tag at the front of a variant's
+	// first bit run (TagBits): written as the constant tagValue, never read
+	// into a field, and absent from the struct's declaration.
+	bitFieldKindTag
+	// bitFieldKindEnum is an enum stored in bits (packedEnum.Bits).
+	bitFieldKindEnum
+	// bitFieldKindPresence is the dynamic layer's pointer presence bit: set
+	// when the pointer is not nil, read into presenceVariable, and the
+	// pointed-to value follows the run.
+	bitFieldKindPresence
 )
 
 type packedBitField struct {
@@ -51,6 +61,20 @@ type packedBitField struct {
 	bitFieldKind         bitFieldKind
 	bitsTargetReflection reflect.Type
 	converter            *converterHash
+	tagValue             uint8
+	enum                 *packedEnum
+	presenceVariable     string
+}
+
+// onlyTag reports whether a bit run holds nothing but a message set's tag,
+// so reading it back has no field to fill.
+func (g packedBitFieldGroup) onlyTag() bool {
+	for _, field := range g.fields {
+		if field.bitFieldKind != bitFieldKindTag {
+			return false
+		}
+	}
+	return true
 }
 
 func (p packedBitField) signed() bool {
@@ -256,6 +280,8 @@ func (field packedBitField) toBytesReceiver(receiverVariable string) string {
 		return receiver + ".Integer()"
 	case bitFieldKindBitsConverter:
 		return fmt.Sprintf("%s.Integer(&%s)", getConverterName(field.converter.hash), receiver)
+	case bitFieldKindTag:
+		return fmt.Sprintf("%d", field.tagValue)
 	}
 
 	return receiver
@@ -292,6 +318,13 @@ func (g packedBitFieldGroup) writeToBytes(
 							receiverVariable+field.packedProperty.name,
 							deposit.destinationShift,
 						)
+						continue
+					}
+
+					if field.bitFieldKind == bitFieldKindPresence {
+						fmt.Fprintf(buffer, "if %s != nil {\n", receiverVariable+field.packedProperty.name)
+						fmt.Fprintf(buffer, "b%d |= 1 << %d\n", wordVariable, deposit.destinationShift)
+						fmt.Fprintf(buffer, "}\n")
 						continue
 					}
 
@@ -342,6 +375,13 @@ func (g packedBitFieldGroup) writeFromBytes(
 ) {
 	placements := g.placements(littleEndian)
 
+	if g.onlyTag() {
+		if advance {
+			fmt.Fprintf(buffer, "%s += %d\n", offsetBase, g.size)
+		}
+		return
+	}
+
 	for word := 0; word < wordCount(g.size); word++ {
 		wordVariable := g.groupIndex + word
 		fmt.Fprintf(buffer, "var b%d uint64\n", wordVariable)
@@ -359,12 +399,15 @@ func (g packedBitFieldGroup) writeFromBytes(
 		// extract every field whose last (highest-addressed) word is this one,
 		// so that a straddling field is reconstructed only after both words exist.
 		for _, placement := range placements {
-			if placement.deposits[len(placement.deposits)-1].word != word {
+			if placement.deposits[len(placement.deposits)-1].word != word || placement.field.bitFieldKind == bitFieldKindTag {
 				continue
 			}
 
 			field := placement.field
 			receiver := receiverVariable + field.packedProperty.name
+			if field.bitFieldKind == bitFieldKindPresence {
+				receiver = field.presenceVariable
+			}
 			rawValue := g.rawValue(placement)
 
 			if placement.straddle {
@@ -401,8 +444,12 @@ func (g packedBitFieldGroup) rawValue(placement bitPlacement) string {
 }
 
 func convertRawValue(field packedBitField, rawValue string) string {
-	if field.bitFieldKind == bitFieldKindBoolean {
+	if field.bitFieldKind == bitFieldKindBoolean || field.bitFieldKind == bitFieldKindPresence {
 		return fmt.Sprintf("(%s) != 0", rawValue)
+	}
+
+	if field.bitFieldKind == bitFieldKindEnum {
+		return fmt.Sprintf("%s(%s)", field.enum.name, rawValue)
 	}
 
 	if field.signed() {

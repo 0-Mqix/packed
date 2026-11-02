@@ -11,6 +11,7 @@ type packedStruct struct {
 	size                   int
 	littleEndian           bool
 	converterCastRecievers map[reflect.Type]int
+	dynamic                bool
 }
 
 func (p packedStruct) Size() int { return p.size }
@@ -82,6 +83,26 @@ func (p *packedStruct) getConverterCastRecievers(converterCastRecievers map[refl
 			packed.getConverterCastRecievers(converterCastRecievers)
 			child.packed = packed
 
+		case kindSlice:
+			packed := child.packed.(packedSlice)
+
+			switch packed.ElementKind {
+
+			case kindStruct:
+				structure := packed.Element.(packedStruct)
+				structure.getConverterCastRecievers(converterCastRecievers)
+				packed.Element = structure
+
+			case kindConverterCast:
+				cast := packed.Element.(converterCast)
+
+				if _, ok := converterCastRecievers[cast.reciever]; !ok {
+					converterCastRecievers[cast.reciever] = len(converterCastRecievers)
+				}
+			}
+
+			child.packed = packed
+
 		case kindArray:
 			packed := child.packed.(packedArray)
 
@@ -126,16 +147,42 @@ func createBitFieldGroup(fields []packedBitField, littleEndian bool) packedPrope
 	return packed
 }
 
+// structMethods are the methods Go gives every struct, which a field of the
+// same name would collide with (and Swift's size() too).
+var structMethods = map[string]bool{"Size": true, "ToBytes": true, "FromBytes": true}
+
+// fieldNames are the names of a struct's fields, those in bit runs too.
+func (p packedStruct) fieldNames() []string {
+	names := []string{}
+	for _, property := range p.properties {
+		if property.kind != kindBitFieldGroup {
+			names = append(names, property.name)
+			continue
+		}
+		for _, field := range property.packed.(packedBitFieldGroup).fields {
+			if field.bitFieldKind != bitFieldKindTag {
+				names = append(names, field.packedProperty.name)
+			}
+		}
+	}
+	return names
+}
+
 func Struct(name string, littleEndian bool, properties ...packedProperty) packedStruct {
 
 	if _, ok := structs[name]; ok {
 		panic(fmt.Sprintf("struct %s already exists", name))
 	}
 
+	if _, ok := enums[name]; ok {
+		panic(fmt.Sprintf("struct %s has the name of an enum", name))
+	}
+
 	processedProperties := []packedProperty{}
 	currentBitFields := []packedBitField{}
 	propertyNames := map[string]bool{}
 	size := 0
+	dynamic := false
 
 	addBitFieldGroup := func(fields []packedBitField, littleEndian bool) {
 		property := createBitFieldGroup(fields, littleEndian)
@@ -149,6 +196,14 @@ func Struct(name string, littleEndian bool, properties ...packedProperty) packed
 			panic(fmt.Sprintf("property %s already exists", property.name))
 		} else {
 			propertyNames[property.name] = true
+		}
+
+		if structMethods[property.name] {
+			panic(fmt.Sprintf("field %s.%s has the name of the %s method every struct gets: rename the field", name, property.name, property.name))
+		}
+
+		if property.dynamic {
+			dynamic = true
 		}
 
 		if property.kind != kindBitField {
@@ -174,12 +229,19 @@ func Struct(name string, littleEndian bool, properties ...packedProperty) packed
 		addBitFieldGroup(currentBitFields, littleEndian)
 	}
 
+	for variant := range messageSetOfStruct {
+		if setName, ok := taggedVariant(variant); ok && nestsStruct(processedProperties, variant) {
+			panic(fmt.Sprintf("struct %s has %s as a field, which carries the tag of message set %s", name, variant, setName))
+		}
+	}
+
 	packed := packedStruct{
 		name:                   name,
 		size:                   size,
 		littleEndian:           littleEndian,
 		properties:             processedProperties,
 		converterCastRecievers: map[reflect.Type]int{},
+		dynamic:                dynamic,
 	}
 
 	bitFieldGroupIndex := 0

@@ -69,9 +69,25 @@ Registers structures for code generation. Call this before `Generate` if you def
 
 From the subpackage `github.com/0-Mqix/packed/generate`. Generates the output Go file with all registered structures and runs `goimports` and `gofmt` on the result. It is the only part of packed that depends on `golang.org/x/tools`; import it from generator programs only, so shipped binaries that link the generated code do not carry the `go/*` toolchain packages.
 
+### `generate.Files(outputs ...generate.Output)`
+
+Writes each output, creating its folder, so a generator lists only the languages its project uses: `generate.GoFile(file, packageName, hooks...)`, `generate.HeaderFile(file)` (C11 and C++20), `generate.KotlinFile(file, packageName)`, `generate.SwiftFile(file, imports...)`, `generate.SwiftErrorFile(file)` and `generate.TypeScriptFile(file, runtime)`. `generate.Generate`, `generate.Header`, `generate.Kotlin`, `generate.Swift`, `generate.SwiftError` and `generate.TypeScript` write one each. The other languages are described in the README.
+
 ### `Source(packageName string, hooks ...GenerateHook) []byte`
 
-The unformatted source `generate.Generate` formats; for callers that want to run their own formatter.
+The unformatted source `generate.Generate` formats; for callers that want to run their own formatter. `HeaderSource()`, `KotlinSource(packageName)`, `SwiftSource(imports...)`, `SwiftErrorSource()` and `TypeScriptSource(runtime)` return the other languages' files.
+
+### `Enum(name string, wire any, values ...string) packedEnum`
+
+A named integer type with the given values, numbered from zero and stored with the integer converter `wire`. Use it as a field type, or `enum.Bits(n)` to store it in a bit field.
+
+### `VariableString(length any)`, `VariableBytes(length any)`, `Slice(length any, element any)`
+
+Variable-length fields: a length prefix written with the unsigned converter `length`, then UTF-8, bytes, or that many elements. A struct holding one is dynamic: its `Size()` computes from the value. `Slice(...).Maximum(n)` caps a list at `n` items, which every language checks; the C header holds it in an array of `n`, and needs it for a list whose elements aren't in the input as they are in memory. The wire is the same either way.
+
+### `MessageSet(name string, parts ...)`, `Variant(typeByte uint8, structure)`, `TagBits(bits int)`
+
+A tagged union: a type byte, then the variant's struct; with `TagBits(n)` first, an `n`-bit tag in the variant's first bit run. Go gets `Encode<Set>`, `Append<Set>` and `Decode<Set>`.
 
 ## Built-in Converters
 
@@ -101,11 +117,13 @@ type MyStruct struct {
 
 func (reciever *MyStruct) Size() int { return 6 }
 
-func (reciever *MyStruct) ToBytes(bytes []byte, index int) {
+// Returns the index just past the struct.
+func (reciever *MyStruct) ToBytes(bytes []byte, index int) int {
     // serialization code
 }
 
-func (reciever *MyStruct) FromBytes(bytes []byte, index int) {
+// Returns the index just past the struct.
+func (reciever *MyStruct) FromBytes(bytes []byte, index int) int {
     // deserialization code
 }
 ```
@@ -436,4 +454,4 @@ This makes generated `FromBytes`/`ToBytes` a drop-in for decoding and encoding p
 - All field names within a struct must be unique (panics on duplicate)
 - Array elements cannot be bare bit fields (panics)
 - `Bits` bit size cannot exceed the underlying integer type's size (panics) — matching C, where an over-wide bit field is a compile error
-- All sizes are fixed at definition time; no variable-length fields
+- A struct without variable-length fields has a size fixed at definition time

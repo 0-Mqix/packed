@@ -157,6 +157,40 @@ func main() {
 		Field("F19", Bits[uint32](1)), Field("F20", Bits[uint32](2)),
 	)
 
+	// Variable-length fields, enums and message sets.
+	Severity := Enum("Severity", Uint8, "Low", "Medium", "High")
+
+	Label := Struct("Label", true,
+		Field("Name", VariableString(Uint8)),
+		Field("Weight", Float32),
+	)
+
+	Record := Struct("Record", true,
+		Field("ID", Uint32),
+		Field("Name", VariableString(Uint16)),
+		Field("Severity", Severity),
+		Field("Flags", Struct("RecordFlags", true,
+			Field("Active", Bit),
+			Field("Level", Bits[uint8](3)),
+		)),
+		Field("Labels", Slice(Uint8, Label)),
+		Field("Values", Slice(Uint16, Int16)),
+		Field("Trailer", Uint16, LittleEndian(false)),
+		Field("Pair", Array(2, VariableString(Uint8))),
+		Field("Nested", Slice(Uint8, Slice(Uint8, Uint8))),
+		Field("Severities", Slice(Uint8, Severity)),
+		Field("Codes", Array(2, Cast[types.ExampleEnum](Int8))),
+	)
+
+	Ping := Struct("Ping", false,
+		Field("Sequence", Uint32),
+	)
+
+	MessageSet("Envelope",
+		Variant(7, Record),
+		Variant(9, Ping),
+	)
+
 	workingDirectory, _ := os.Getwd()
 
 	generated := path.Join(workingDirectory, "/output.go")

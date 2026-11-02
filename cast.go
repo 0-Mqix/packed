@@ -11,6 +11,21 @@ type converterCast struct {
 	reciever  reflect.Type
 	target    reflect.Type
 	size      int
+	// targetName is the target as the generated file writes it, for a type
+	// the dynamic layer read from go/types and so has no reflect.Type of.
+	targetName string
+	// overflow is a statement the decoder runs when the value read does not
+	// survive the conversion to the target (an Int64 read into an int where
+	// int is 32 bits).
+	overflow string
+}
+
+// targetType is the target as the generated file writes it.
+func (c converterCast) targetType() string {
+	if c.targetName != "" {
+		return c.targetName
+	}
+	return c.target.String()
 }
 
 func (c converterCast) Size() int {
@@ -72,7 +87,10 @@ func (c converterCast) Write(buffer *bytes.Buffer, structure *packedStruct, reci
 
 	case "FromBytes":
 		fmt.Fprintf(buffer, "%s.FromBytes%s(&r%d, bytes, %s)\n", getConverterName(c.converter.hash), endian, recieverIndex, offsetVariable)
-		fmt.Fprintf(buffer, "%s = %s(r%d)\n", recieverVariable, c.target, recieverIndex)
+		fmt.Fprintf(buffer, "%s = %s(r%d)\n", recieverVariable, c.targetType(), recieverIndex)
+		if c.overflow != "" {
+			fmt.Fprintf(buffer, "if %s(%s) != r%d {\n%s\n}\n", c.reciever, recieverVariable, recieverIndex, c.overflow)
+		}
 
 	default:
 		panic("invalid function name")
